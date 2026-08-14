@@ -3,7 +3,7 @@
    so everything is precached and served from cache first. Freshness is a
    second-order concern: updates land on the next visit. */
 
-const CACHE = 'ehw-v1';
+const CACHE = 'ehw-v2';
 
 const PRECACHE = [
   './',
@@ -11,6 +11,7 @@ const PRECACHE = [
   './manifest.json',
   './fonts/Andika-Regular.woff2',
   './fonts/Andika-Bold.woff2',
+  './fonts/Pretendard-Bold.woff2',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png'

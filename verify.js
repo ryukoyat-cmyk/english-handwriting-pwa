@@ -49,7 +49,7 @@ async function fresh(browser, vw, vh) {
       // resolve the four rule positions straight out of the computed background
       const pos = getComputedStyle(g).backgroundPosition
         .split(',').map(s => parseFloat(s.trim().split(/\s+/)[1]));
-      const L1 = pos[0], L2 = pos[1], L3 = pos[2], L4 = pos[3] + 2;
+      const L1 = pos[0], L2 = pos[1], L3 = pos[2], L4 = pos[3];
 
       // ink extents of the rendered text, measured against the element's top
       const cvs = document.createElement('canvas').getContext('2d');
@@ -87,24 +87,52 @@ async function fresh(browser, vw, vh) {
     (ascTop > prevL4 ? ok : bad)('F-2 ascender clears block above',
       `ascender top ${ascTop.toFixed(1)} vs previous L4 ${prevL4.toFixed(1)} (여유 ${(ascTop - prevL4).toFixed(1)}px)`);
     console.log(`    · ascender rises ${(m.L1 - ascTop).toFixed(1)}px above L1; gap is ${(m.band - (m.L4 - m.L1)).toFixed(1)}px (font-size ${m.F.toFixed(1)}px)`);
+
+    // Regression guard: background-position for L4 must not exceed the tile
+    // height, or repeat-y wraps it back to the TOP of the same block and a
+    // phantom rule appears above L1 (the bug this fix addresses).
+    const noWrap = m.L1 < m.L2 && m.L2 < m.L3 && m.L3 < m.L4 && m.L4 <= m.band + 0.5;
+    (noWrap ? ok : bad)('F-2 no background-position wraparound',
+      `L1 ${m.L1.toFixed(1)} < L2 ${m.L2.toFixed(1)} < L3 ${m.L3.toFixed(1)} < L4 ${m.L4.toFixed(1)} <= band ${m.band.toFixed(1)}`);
     await ctx.close();
   }
 
-  /* ---------- F-3 / F-4 sizing driven by line count ---------- */
+  /* ---------- F-3 sizing / F-4 Korean gloss is fixed, not line-count-driven ---------- */
   {
     const { ctx, page } = await fresh(browser, 1440, 900);
     const one = await page.evaluate(() => {
       const st = document.querySelector('.stage').clientHeight;
       const g  = document.querySelector('.guide').getBoundingClientRect().height;
-      return { ratio: g / st, ko: parseFloat(getComputedStyle(document.querySelector('.ko')).fontSize) };
+      const ko = document.querySelector('.ko');
+      const cs = getComputedStyle(ko);
+      return { ratio: g / st, koPx: parseFloat(cs.fontSize), koFamily: cs.fontFamily, koWeight: cs.fontWeight };
     });
     (one.ratio >= 0.70 ? ok : bad)('F-3 N=1 fills screen', `guide/stage = ${(one.ratio * 100).toFixed(0)}%`);
+    (one.koPx >= 26 ? ok : bad)('F-4 Korean size is large', `${one.koPx.toFixed(1)}px (was 17px)`);
+    (one.koFamily.toLowerCase().includes('pretendard') ? ok : bad)('F-4 Korean uses Pretendard', one.koFamily);
+    (Number(one.koWeight) >= 700 ? ok : bad)('F-4 Korean is bold', `weight ${one.koWeight}`);
 
     await page.evaluate(() => document.querySelectorAll('#lineCount button')[2].click());
     await page.waitForTimeout(200);
     const three = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.ko')).fontSize));
-    (three >= 32 ? ok : bad)('F-4 Korean size @N=3', `${three.toFixed(1)}px (was 17px)`);
-    console.log(`    · Korean: N=1 → ${one.ko.toFixed(0)}px, N=3 → ${three.toFixed(0)}px`);
+    (Math.abs(three - one.koPx) < 0.5 ? ok : bad)('F-4 Korean size independent of line count',
+      `N=1 → ${one.koPx.toFixed(1)}px, N=3 → ${three.toFixed(1)}px`);
+    await ctx.close();
+  }
+
+  /* ---------- F-12 sentence-size slider ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+    const f100 = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.guide')).fontSize));
+    await page.fill('#scale', '50');
+    await page.locator('#scale').dispatchEvent('input');
+    await page.waitForTimeout(150);
+    const f50 = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.guide')).fontSize));
+    (near(f50 / f100, 0.5, 0.02) ? ok : bad)('F-12 size slider scales English text',
+      `100% → ${f100.toFixed(1)}px, 50% → ${f50.toFixed(1)}px (ratio ${(f50 / f100).toFixed(3)})`);
+
+    const koUnchanged = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.ko')).fontSize));
+    (koUnchanged >= 26 ? ok : bad)('F-12 Korean unaffected by size slider', `${koUnchanged.toFixed(1)}px`);
     await ctx.close();
   }
 
@@ -184,11 +212,14 @@ async function fresh(browser, vw, vh) {
     await page.waitForTimeout(200);
     const r = await page.evaluate(() => ({
       first: document.querySelector('.guide').textContent,
-      stored: window.__app.state.rows[0].en,
-      bold: document.querySelectorAll('.sheet b').length
+      // `en` is now sanitized HTML (so a teacher can color a word) rather than
+      // plain text — round-trip it back through the DOM to compare fairly.
+      storedText: window.__app.plainTextOf(window.__app.state.rows[0].en),
+      bold: document.querySelectorAll('.sheet b').length,
+      script: document.querySelectorAll('.sheet script, .sheet img, .sheet a').length
     }));
-    (r.first === evil && r.stored === evil && r.bold === 0 ? ok : bad)(
-      'F-11 no HTML injection', `text ${JSON.stringify(r.first)} · <b> ${r.bold}`);
+    (r.first === evil && r.storedText === evil && r.bold === 0 && r.script === 0 ? ok : bad)(
+      'F-11 no HTML injection', `text ${JSON.stringify(r.first)} · <b> ${r.bold} · other-tags ${r.script}`);
     await ctx.close();
   }
 
@@ -241,6 +272,93 @@ async function fresh(browser, vw, vh) {
       spans: document.querySelectorAll('.bar span[onclick]').length
     }));
     (a.enLang === 'en' && a.toolsHoverFree ? ok : bad)('F-10 a11y basics', JSON.stringify(a));
+    await ctx.close();
+  }
+
+  /* ---------- F-13 Korean gloss never shows the browser's red spellcheck marks ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+    const s = await page.evaluate(() => {
+      const ko = document.querySelector('.ko');
+      return { spellcheck: ko.spellcheck, autocorrect: ko.getAttribute('autocorrect'), gramm: ko.getAttribute('data-gramm') };
+    });
+    (s.spellcheck === false && s.autocorrect === 'off' && s.gramm === 'false' ? ok : bad)(
+      'F-13 Korean spellcheck disabled', JSON.stringify(s));
+    await ctx.close();
+  }
+
+  /* ---------- F-14 word/phrase color highlighting ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+
+    // sanitizer: only the three whitelisted colors survive, everything else is stripped
+    const san = await page.evaluate(() => {
+      const app = window.__app;
+      const evil = 'a <span style="color:#e0322b">red</span> <span style="color:lime">lime</span> ' +
+                   '<b onclick="x">bold</b> <img src=x onerror=alert(1)> <script>alert(1)<\/script> end';
+      const out = app.sanitizeInline(evil);
+      const div = document.createElement('div'); div.innerHTML = out;
+      return {
+        html: out,
+        text: div.textContent,
+        allowedSpan: div.querySelectorAll('span[style*="rgb(224, 50, 43)"], span[style*="#e0322b"]').length,
+        dangerous: div.querySelectorAll('script,img,b,[onclick],[onerror]').length
+      };
+    });
+    (san.allowedSpan >= 1 && san.dangerous === 0 && san.text.includes('lime') && san.text.includes('bold')
+      ? ok : bad)('F-14 sanitizer keeps only whitelisted color spans', JSON.stringify(san));
+
+    // end-to-end: select part of a sentence and click the red swatch
+    const guide = page.locator('.guide').first();
+    await page.evaluate(() => {
+      const g = document.querySelector('.guide');
+      g.textContent = 'The apple is red.'; g.dispatchEvent(new Event('input'));
+    });
+    const box = await guide.boundingBox();
+    // double-click the second word ("apple") to select it, independent of exact pixel metrics
+    await page.evaluate(() => {
+      const g = document.querySelector('.guide');
+      const t = g.firstChild;
+      const range = document.createRange();
+      range.setStart(t, 4); range.setEnd(t, 9);   // "apple"
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+    await page.waitForTimeout(150);
+    const popVisible = await page.evaluate(() => !document.getElementById('colorpop').hidden);
+    (popVisible ? ok : bad)('F-14 color popup appears on selection', `hidden=${!popVisible}`);
+
+    if (popVisible) {
+      await page.click('#colorpop button[data-c="#e0322b"]');
+      await page.waitForTimeout(150);
+      const applied = await page.evaluate(() => ({
+        stored: window.__app.state.rows[0].en,
+        renderedText: document.querySelector('.guide').textContent
+      }));
+      // the browser normalizes "#e0322b" to its rgb() form when serializing style.color
+      const hasRedSpan = /color:\s*rgb\(224,\s*50,\s*43\)/.test(applied.stored);
+      (hasRedSpan && applied.renderedText === 'The apple is red.'
+        ? ok : bad)('F-14 color applied and persisted', JSON.stringify(applied));
+    }
+    await ctx.close();
+  }
+
+  /* ---------- F-15 speaker: prominent placement + 0.8x rate ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+    const layout_ = await page.evaluate(() => {
+      const btn = document.querySelector('.row .speakBtn');
+      const inTools = !!document.querySelector('.rowtools .speakBtn');
+      const r = btn.getBoundingClientRect();
+      return { exists: !!btn, inTools, w: r.width, h: r.height };
+    });
+    (layout_.exists && !layout_.inTools && layout_.w >= 44 ? ok : bad)(
+      'F-15 speaker button is prominent, outside rowtools', JSON.stringify(layout_));
+
+    await page.click('.row .speakBtn');
+    await page.waitForTimeout(150);
+    const rate = await page.evaluate(() => window.__app.lastRate);
+    (rate === 0.8 ? ok : bad)('F-15 speech rate is 0.8x', `rate=${rate}`);
     await ctx.close();
   }
 
