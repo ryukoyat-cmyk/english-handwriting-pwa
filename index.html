@@ -1,186 +1,709 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f6f7fb" />
-  <title>노트 — 영어 필기 수업 도구</title>
-  <style>
-    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    @font-face { font-family:EnglishPractice; src:url('./fonts/Kalam-Bold.ttf') format('truetype'); font-weight:700; font-display:block; }
-    :root { --ink:#20252d; --muted:#7c8491; --line:#b8c0cc; --blue:#6bb6e6; --blue-deep:#2176ae; --orange:#eb6536; --paper:#fff; --bg:#f3f5f8; --sidebar:268px; --guide-height:124px; }
-    * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--ink); font-family:Pretendard,system-ui,sans-serif; }
-    button,input { font:inherit; }
-    button { cursor:pointer; border:0; }
-    .app { min-height:100vh; display:grid; grid-template-columns:var(--sidebar) 1fr; }
-    .sidebar { background:#fff; border-right:1px solid #e1e5ea; padding:27px 18px; display:flex; flex-direction:column; gap:25px; }
-    .brand { display:flex; align-items:center; gap:11px; font-weight:800; font-size:23px; letter-spacing:-.06em; padding:0 10px; }
-    .brand-mark { width:31px; height:37px; border:2px solid var(--ink); border-radius:6px; display:grid; place-items:center; position:relative; background:#f9fbfd; }
-    .brand-mark:before { content:'Aa'; color:#3488be; font-weight:900; font-size:11px; border:1px solid #d3dce6; padding:2px; }
-    .brand-mark:after { content:''; position:absolute; left:5px; right:5px; bottom:5px; height:2px; background:#9da8b4; box-shadow:0 -4px #9da8b4,0 -8px #9da8b4; }
-    .new-btn { background:var(--orange); color:white; border-radius:12px; padding:13px 15px; font-weight:750; display:flex; align-items:center; gap:9px; box-shadow:0 5px 12px #eb65362b; }
-    .plus { font-size:24px; line-height:16px; font-weight:300; }
-    .side-label { color:#a1a9b5; font-size:12px; font-weight:700; padding:0 10px; margin-bottom:-12px; }
-    .doc-list { display:flex; flex-direction:column; gap:6px; }
-    .doc { padding:12px 12px; border-radius:10px; display:flex; gap:10px; align-items:center; color:#515a67; }
-    .doc.active { background:#fff1eb; color:#d9552c; font-weight:700; }
-    .doc-icon { font-size:17px; } .doc small { display:block; font-size:11px; color:#a1a9b5; margin-top:3px; font-weight:500; }
-    .sidebar-foot { margin-top:auto; color:#89929f; font-size:12px; line-height:1.6; padding:10px; }
-    .main { min-width:0; }
-    .topbar { height:75px; background:#fff; border-bottom:1px solid #e1e5ea; display:flex; align-items:center; justify-content:space-between; padding:0 28px; gap:20px; }
-    .title { border:0; outline:0; font-size:25px; font-weight:800; color:#252a31; min-width:220px; letter-spacing:-.04em; background:transparent; }
-    .title::placeholder { color:#b4bbc4; }
-    .top-actions,.toolbar-actions { display:flex; align-items:center; gap:8px; }
-    .icon-btn { width:39px; height:39px; border-radius:10px; background:#f5f7f9; color:#596473; font-size:18px; display:grid; place-items:center; }
-    .icon-btn:hover { background:#e9eef3; } .icon-btn.orange { color:var(--orange); background:#fff0eb; }
-    .toolbar { min-height:72px; background:#fff; border-bottom:1px solid #e0e4e9; padding:13px 28px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-    .tool-group { display:flex; align-items:center; gap:8px; padding-right:20px; border-right:1px solid #e6e9ed; }
-    .tool-group:last-child { border:0; margin-left:auto; padding-right:0; }
-    .tool-label { color:#7a8490; font-size:12px; font-weight:700; }
-    .select,.range { border:1px solid #dce2e8; background:#fff; border-radius:8px; padding:9px 11px; color:#3f4854; }
-    .range { width:105px; accent-color:var(--orange); padding:0; }
-    .toggle { display:flex; align-items:center; gap:8px; color:#505a66; font-size:13px; font-weight:650; }
-    .switch { width:38px; height:22px; border-radius:20px; background:#c7ced7; padding:3px; transition:.2s; }
-    .switch:before { content:''; display:block; width:16px; height:16px; border-radius:50%; background:#fff; transition:.2s; box-shadow:0 1px 3px #0002; }
-    .switch.on { background:var(--orange); } .switch.on:before { transform:translateX(16px); }
-    .canvas-wrap { padding:25px 34px 80px; overflow:auto; }
-    .paper { max-width:1200px; min-height:780px; margin:0 auto; background:var(--paper); border:1px solid #e6e9ed; box-shadow:0 15px 38px #2633420d; border-radius:5px; padding:34px 48px 70px; }
-    .paper-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:26px; }
-    .paper-kicker { font-size:12px; color:var(--orange); font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
-    .paper h1 { margin:6px 0 0; font-size:28px; letter-spacing:-.05em; }
-    .paper-note { color:#9ca5af; font-size:12px; text-align:right; line-height:1.6; }
-    .row { position:relative; margin:24px 0 28px; padding:0 62px 0 18px; }
-    .row-number { position:absolute; left:0; top:9px; color:#b2bac4; font-size:11px; font-weight:800; }
-    .guide { position:relative; height:var(--guide-height); border-top:2px solid #929ca7; border-bottom:2px solid #929ca7; background:linear-gradient(to bottom, transparent 0, transparent calc(34.7% - 1px), var(--line) calc(34.7% - 1px), var(--line) calc(34.7% + 1px), transparent calc(34.7% + 1px), transparent calc(69.4% - 1px), var(--blue) calc(69.4% - 1px), var(--blue) calc(69.4% + 1px), transparent calc(69.4% + 1px)); }
-    .guide:after { content:''; position:absolute; left:0; right:0; top:34.7%; border-top:2px dashed #aab2bc; opacity:.95; }
-    .english-input { position:absolute; left:14px; right:12px; top:0; height:100%; border:0; outline:0; background:transparent; color:transparent; caret-color:#222a33; font-family:EnglishPractice,sans-serif; font-size:100px; line-height:1; font-weight:700; letter-spacing:0; z-index:5; pointer-events:auto; }
-    .english-input::placeholder { color:transparent; }
-    .typed-layer { position:absolute; left:14px; right:12px; top:0; width:calc(100% - 26px); height:100%; overflow:visible; pointer-events:none; z-index:4; }
-    .typed-layer text { fill:#050505; font-family:EnglishPractice,sans-serif; font-weight:700; letter-spacing:0; dominant-baseline:alphabetic; }
-    .trace { display:none; position:absolute; left:14px; top:0; color:#9fb4c5; opacity:.32; font-size:43px; line-height:1.45; pointer-events:none; letter-spacing:-.035em; }
-    .stroke-layer { position:absolute; inset:0; width:100%; height:100%; z-index:3; touch-action:none; cursor:crosshair; }
-    .korean-line { margin-top:9px; display:flex; align-items:center; gap:12px; color:#77818d; font-size:17px; }
-    .korean-line input { border:0; border-bottom:1px solid #dce1e6; outline:0; flex:1; color:#5f6a77; padding:5px 2px; background:transparent; }
-    .row-tools { position:absolute; right:0; top:7px; display:flex; flex-direction:column; gap:7px; opacity:0; transition:.15s; }
-    .row:hover .row-tools,.row:focus-within .row-tools { opacity:1; }
-    .row-tools button { width:34px; height:34px; border-radius:9px; background:#f2f5f7; color:#62707d; }
-    .row-tools button:hover { color:var(--orange); background:#fff0eb; }
-    .floating { position:fixed; right:30px; bottom:28px; width:58px; height:58px; border-radius:50%; background:#20252d; color:white; font-size:30px; box-shadow:0 8px 22px #20252d35; }
-    .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); opacity:0; pointer-events:none; background:#20252d; color:#fff; padding:11px 17px; border-radius:999px; font-size:13px; transition:.25s; }
-    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    @media (max-width:1100px) {
-      :root { --sidebar:0px; }
-      .sidebar { display:none; }
-      .topbar { height:64px; padding:0 18px; }
-      .title { font-size:20px; }
-      .toolbar { min-height:62px; padding:10px 18px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; gap:14px; scrollbar-width:thin; }
-      .toolbar .tool-group { flex:0 0 auto; min-width:max-content; padding-right:14px; }
-      .toolbar .tool-group:last-child { margin-left:0; }
-      .tool-label { white-space:nowrap; }
-      .toggle { white-space:nowrap; }
-      .canvas-wrap { padding:16px 14px 70px; }
-      .paper { padding:25px 24px 55px; }
-      .paper-head { margin-bottom:18px; }
-    }
-    @media (max-width:700px) {
-      .topbar { padding:0 12px; }
-      .title { min-width:0; width:170px; font-size:18px; }
-      .top-actions { gap:4px; }
-      .icon-btn { width:34px; height:34px; }
-      .canvas-wrap { padding:10px 6px 64px; }
-      .paper { padding:20px 14px 46px; border-radius:3px; }
-      .paper h1 { font-size:22px; }
-      .paper-note { display:none; }
-      .row { padding-right:38px; margin:18px 0 22px; }
-      .english-input { font-size:72px; }
-      .typed-layer text { font-size:72px; }
-      .row-tools { right:-2px; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#eef1f5" />
+<title>영어 4선 칠판</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="4선 칠판" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23fff'/%3E%3Cg stroke='%238f9bab' stroke-width='1.6'%3E%3Cpath d='M3 7h26M3 25h26'/%3E%3C/g%3E%3Cpath d='M3 13h26' stroke='%23b6c3d2' stroke-width='1.2'/%3E%3Cpath d='M3 19h26' stroke='%234a9fd8' stroke-width='1.6'/%3E%3Ctext x='16' y='19' font-family='Georgia,serif' font-size='15' text-anchor='middle' fill='%231b2027'%3EAa%3C/text%3E%3C/svg%3E" />
+<style>
+  @font-face { font-family:Andika; src:url('./fonts/Andika-Regular.woff2') format('woff2'); font-weight:400; font-display:swap; }
+  @font-face { font-family:Andika; src:url('./fonts/Andika-Bold.woff2') format('woff2'); font-weight:700; font-display:swap; }
+
+  :root{
+    --bg:#eef1f5; --paper:#fff; --ink:#1b2027; --muted:#79838f; --hair:#e3e8ee;
+    --accent:#eb6536; --accent-soft:#fff1ea;
+    --l-outer:#8f9bab; --l-x:#b6c3d2; --l-base:#4a9fd8;
+    --F:64px; --band:120px; --ko:22px; --gpos:0 0; --rowH:220px;
+    --pen:#1b2027;
+  }
+  *{ box-sizing:border-box; }
+  [hidden]{ display:none !important; }   /* .grp{display:flex} would otherwise win */
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  button,input,select{ font:inherit; color:inherit; }
+  button{ cursor:pointer; border:0; background:none; }
+
+  /* ---------- toolbar ---------- */
+  .bar{
+    height:60px; background:var(--paper); border-bottom:1px solid var(--hair);
+    display:flex; align-items:center; gap:14px; padding:0 16px;
+    overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; white-space:nowrap;
+  }
+  .grp{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+  .grp + .grp{ border-left:1px solid var(--hair); padding-left:14px; }
+  .grp.end{ margin-left:auto; border-left:0; padding-left:0; }
+  .lbl{ color:var(--muted); font-size:12px; font-weight:700; flex:0 0 auto; }
+  .title{ border:0; outline:0; background:transparent; font-size:19px; font-weight:800; letter-spacing:-.03em; width:190px; min-width:120px; }
+  .title::placeholder{ color:#b7bfc9; }
+
+  .btn{ height:38px; min-width:38px; padding:0 12px; border-radius:10px; background:#f2f5f8; color:#4b5563; font-size:14px; font-weight:650; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+  .btn:hover{ background:#e6ecf2; }
+  .btn[aria-pressed="true"], .btn.on{ background:var(--accent); color:#fff; }
+  .btn.ghost{ background:transparent; }
+  .btn:disabled{ opacity:.38; cursor:default; }
+
+  .seg{ display:flex; background:#f2f5f8; border-radius:11px; padding:3px; gap:2px; }
+  .seg button{ height:32px; padding:0 13px; border-radius:8px; font-size:14px; font-weight:700; color:#5b6673; }
+  .seg button[aria-pressed="true"]{ background:var(--paper); color:var(--accent); box-shadow:0 1px 3px #0000001f; }
+
+  .swatch{ width:28px; height:28px; border-radius:50%; border:2px solid transparent; padding:0; }
+  .swatch span{ display:block; width:100%; height:100%; border-radius:50%; box-shadow:inset 0 0 0 1px #00000018; }
+  .swatch[aria-pressed="true"]{ border-color:var(--accent); }
+  .nib{ width:34px; height:34px; border-radius:9px; background:#f2f5f8; display:grid; place-items:center; }
+  .nib i{ display:block; background:#4b5563; border-radius:50%; }
+  .nib[aria-pressed="true"]{ background:var(--accent); } .nib[aria-pressed="true"] i{ background:#fff; }
+
+  .rng{ width:96px; accent-color:var(--accent); }
+  .sel{ height:38px; border:1px solid #dbe2e9; background:var(--paper); border-radius:10px; padding:0 9px; }
+  .dot{ width:9px; height:9px; border-radius:50%; background:#3fae7c; transition:.25s; }
+  .dot.pending{ background:#e0b23c; }
+
+  /* ---------- stage ---------- */
+  .stage{ height:calc(100% - 60px); overflow:auto; overscroll-behavior:contain; padding:18px 20px 26px; }
+  body.snap .stage{ scroll-snap-type:y proximity; }
+  .sheet{ position:relative; background:var(--paper); border:1px solid var(--hair); border-radius:8px; box-shadow:0 10px 30px #1b20270d; padding:14px 26px 20px; min-height:100%; }
+
+  .row{ position:relative; min-height:var(--rowH); display:flex; flex-direction:column; justify-content:center; }
+  body.snap .row{ scroll-snap-align:center; }
+  .row + .row{ border-top:1px dashed #eaeef3; }
+
+  .guide{
+    font-family:Andika,Georgia,"Times New Roman",serif; font-weight:400;
+    font-size:var(--F); line-height:var(--band);
+    outline:0; padding:0 .12em; margin:0;
+    background-image:
+      linear-gradient(var(--l-outer) 0 2px, transparent 2px),
+      linear-gradient(var(--l-x)     0 1.5px, transparent 1.5px),
+      linear-gradient(var(--l-base)  0 2px, transparent 2px),
+      linear-gradient(var(--l-outer) 0 2px, transparent 2px);
+    background-repeat:repeat-y;
+    background-size:100% var(--band);
+    background-position:var(--gpos);
+    background-origin:border-box;
+    caret-color:var(--accent);
+    word-break:break-word;
+    -webkit-user-modify:read-write-plaintext-only;
+  }
+  .guide:empty::before{ content:attr(data-ph); color:#c3cbd5; }
+
+  .ko{
+    font-size:var(--ko); line-height:1.35; color:#55606d; font-weight:500;
+    outline:0; margin:6px 0 0; padding:2px 4px; border-radius:6px; min-height:1.35em;
+    word-break:break-word;
+  }
+  .ko:empty::before{ content:attr(data-ph); color:#c3cbd5; }
+  .ko:focus{ background:#f6f8fb; }
+
+  .rowtools{
+    position:absolute; top:4px; right:4px; z-index:6;
+    display:flex; align-items:center; gap:6px;
+    background:#ffffffec; border:1px solid var(--hair); border-radius:11px;
+    padding:5px 8px; box-shadow:0 2px 8px #1b20270f;
+  }
+  body.mode-draw .rowtools{ display:none; }
+  .rowtools .num{ color:#aab3be; font-size:11px; font-weight:800; min-width:16px; }
+  .rowtools .rng{ width:74px; }
+  .rowtools button{ width:28px; height:28px; border-radius:8px; color:#65707d; font-size:14px; }
+  .rowtools button:hover{ background:var(--accent-soft); color:var(--accent); }
+
+  /* ---------- ink ---------- */
+  #ink{ position:absolute; inset:0; z-index:4; touch-action:none; pointer-events:none; }
+  body.mode-draw #ink{ pointer-events:auto; cursor:crosshair; }
+  body.mode-draw .guide, body.mode-draw .ko{ -webkit-user-modify:read-only; user-select:none; }
+  body.mode-draw .stage{ overscroll-behavior:none; }
+
+  .fab{ position:fixed; right:22px; bottom:20px; height:52px; padding:0 20px; border-radius:26px; background:var(--ink); color:#fff; font-size:15px; font-weight:700; box-shadow:0 8px 22px #1b202740; display:flex; align-items:center; gap:8px; z-index:20; }
+  body.mode-draw .fab{ display:none; }
+
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translate(-50%,16px); opacity:0; pointer-events:none; background:#1b2027; color:#fff; padding:10px 16px; border-radius:999px; font-size:13px; transition:.22s; z-index:30; }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+
+  #metrics{ position:absolute; left:-9999px; top:0; visibility:hidden; white-space:nowrap; padding:0; margin:0; border:0; }
+  .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+  @media (max-width:640px){
+    .title{ width:120px; font-size:16px; }
+    .stage{ padding:10px 8px 20px; }
+    .sheet{ padding:10px 12px 16px; border-radius:5px; }
+    .fab{ right:14px; bottom:14px; height:46px; padding:0 16px; }
+  }
+
+  /* ---------- print ---------- */
+  @media print{
+    @page{ margin:14mm; }
+    html,body{ height:auto; overflow:visible; background:#fff; }
+    .bar,.fab,.toast,.rowtools{ display:none !important; }
+    .stage{ height:auto; overflow:visible; padding:0; }
+    .sheet{ box-shadow:none; border:0; border-radius:0; padding:0; min-height:0; }
+    .row{ break-inside:avoid; page-break-inside:avoid; }
+    .row + .row{ border-top:0; }
+    body:not(.print-ink) #ink{ display:none; }
+    .guide:empty::before, .ko:empty::before{ content:none; }
+  }
+</style>
 </head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark"></span><span>노트</span></div>
-      <button class="new-btn" id="newDoc"><span class="plus">＋</span> 새 학습지</button>
-      <div class="side-label">최근 문서</div>
-      <div class="doc-list">
-        <div class="doc active"><span class="doc-icon">▤</span><span>초등 영어 4선<small>방금 전 저장됨</small></span></div>
-        <div class="doc"><span class="doc-icon">▤</span><span>My family<small>어제 오후 3:12</small></span></div>
-        <div class="doc"><span class="doc-icon">▤</span><span>Daily sentences<small>8월 12일</small></span></div>
-      </div>
-      <div class="sidebar-foot">전자칠판에서 쓰고,<br>문장을 눌러 바로 들어보세요.</div>
-    </aside>
-    <main class="main">
-      <header class="topbar">
-        <input class="title" value="초등 영어 4선" aria-label="문서 제목" />
-        <div class="top-actions">
-          <button class="icon-btn" title="전체 화면" id="fullscreen">⛶</button>
-          <button class="icon-btn" title="설정">⚙</button>
-          <button class="icon-btn orange" title="인쇄" onclick="window.print()">▣</button>
-        </div>
-      </header>
-      <section class="toolbar">
-        <div class="tool-group"><span class="tool-label">4선 규격</span><span class="select">기본 좁은 규격</span></div>
-        <div class="tool-group"><label class="toggle"><span class="switch on" data-toggle="trace"></span> 회색 따라쓰기</label><label class="toggle"><span class="switch on" data-toggle="korean"></span> 한글 뜻</label></div>
-        <div class="tool-group"><span class="tool-label">용지</span><select class="select" id="orientation"><option value="portrait">A4 세로</option><option value="landscape" selected>A4 가로</option></select></div>
-        <div class="tool-group"><span class="tool-label">자동 저장됨</span><span style="color:#3c9c70;font-weight:800;font-size:14px">●</span></div>
-      </section>
-      <div class="canvas-wrap">
-        <section class="paper" id="paper">
-          <div class="paper-head"><div><div class="paper-kicker">English handwriting practice</div><h1>오늘의 문장</h1></div><div class="paper-note">4선에 맞춰 타이핑하고<br>전자칠판에 직접 써보세요</div></div>
-          <div id="rows"></div>
-        </section>
-      </div>
-    </main>
+<body class="mode-edit snap">
+
+<header class="bar">
+  <input class="title" id="title" aria-label="학습지 제목" placeholder="제목" />
+
+  <div class="grp">
+    <div class="seg" role="group" aria-label="모드">
+      <button id="mEdit"  aria-pressed="true">✏️ 편집</button>
+      <button id="mDraw"  aria-pressed="false">🖊️ 필기</button>
+    </div>
   </div>
-  <button class="floating" id="addRow" aria-label="문장 추가">＋</button>
-  <div class="toast" id="toast"></div>
-  <script>
-    const initial = [
-      ['The apple is red.', '그 사과는 빨간색입니다.'],
-      ['I like reading books.', '나는 책 읽는 것을 좋아합니다.'],
-      ['This is my classroom.', '여기는 나의 교실입니다.']
-    ];
-    let rows = [...initial]; let traceOn = true; let koreanOn = true; let drawing = false; let activeSvg = null; let activePath = null;
-    const rowsEl = document.getElementById('rows'), toast = document.getElementById('toast');
-    function notify(text){ toast.textContent=text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1800); }
-    function speak(text){ if(!text.trim()) return notify('읽을 문장을 먼저 입력하세요.'); if('speechSynthesis' in window){ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; u.rate=0.9; speechSynthesis.speak(u); notify('문장을 읽고 있어요'); } else notify('이 브라우저에서는 음성을 지원하지 않아요.'); }
-    function makeRow(item, i){
-      const row=document.createElement('div'); row.className='row'; row.innerHTML=`<span class="row-number">${String(i+1).padStart(2,'0')}</span><div class="guide"><span class="trace">${item[0]}</span><svg class="typed-layer" viewBox="0 0 1000 124" preserveAspectRatio="none"><text class="typed-text" x="0" y="86">${item[0]}</text></svg><input class="english-input" value="${item[0]}" aria-label="영어 문장 ${i+1}"/><svg class="stroke-layer" viewBox="0 0 1000 124" preserveAspectRatio="none"></svg></div><div class="korean-line"><span>한글</span><input value="${item[1]}" aria-label="한글 뜻 ${i+1}"/></div><div class="row-tools"><button title="문장 읽기" class="speak">🔊</button><button title="필기 인식 후 읽기" class="ocr">✦</button><button title="행 삭제" class="remove">×</button></div>`;
-      const input=row.querySelector('.english-input'), trace=row.querySelector('.trace'), typed=row.querySelector('.typed-text'), guide=row.querySelector('.guide');
-      input.addEventListener('input',()=>{trace.textContent=input.value; typed.textContent=input.value; rows[i][0]=input.value; notify('자동 저장됨');});
-      row.querySelector('.korean-line input').addEventListener('input',e=>rows[i][1]=e.target.value);
-      row.querySelector('.speak').onclick=()=>speak(input.value);
-      row.querySelector('.ocr').onclick=()=>notify('필기 인식 API 연결 자리예요');
-      row.querySelector('.remove').onclick=()=>{ if(rows.length>1){rows.splice(i,1); render();} };
-      const svg=row.querySelector('svg');
-      svg.addEventListener('pointerdown',e=>{ drawing=true; activeSvg=svg; const p=svg.createSVGPoint(); p.x=e.offsetX; p.y=e.offsetY; activePath=document.createElementNS('http://www.w3.org/2000/svg','path'); activePath.setAttribute('fill','none'); activePath.setAttribute('stroke','#26313c'); activePath.setAttribute('stroke-width','4'); activePath.setAttribute('stroke-linecap','round'); activePath.setAttribute('d',`M ${p.x} ${p.y}`); svg.appendChild(activePath); svg.setPointerCapture(e.pointerId); });
-      svg.addEventListener('pointermove',e=>{ if(!drawing||activeSvg!==svg)return; const p=svg.createSVGPoint(); p.x=e.offsetX; p.y=e.offsetY; activePath.setAttribute('d',activePath.getAttribute('d')+` L ${p.x} ${p.y}`); });
-      ['pointerup','pointercancel','pointerleave'].forEach(ev=>svg.addEventListener(ev,()=>{drawing=false;activeSvg=null;activePath=null;}));
-      return row;
-    }
-    function render(){rowsEl.innerHTML=''; rows.forEach((r,i)=>rowsEl.appendChild(makeRow(r,i))); applySettings();}
-    let guideMetrics = { topLine:0, midLine:43, baseline:86, bottomLine:124, fontSize:100, baselineOffset:0 };
-    function calculateGuideMetrics(){ return guideMetrics; }
-    function calibrateFontMetrics(){
-      const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
-      ctx.font='700 100px EnglishPractice';
-      const x=ctx.measureText('x'), H=ctx.measureText('H'), y=ctx.measureText('y');
-      const xHeight=x.actualBoundingBoxAscent||53, ascent=H.actualBoundingBoxAscent||76, descent=y.actualBoundingBoxDescent||22;
-      const scale=43/xHeight;
-      guideMetrics={ topLine:0, midLine:43, baseline:86, bottomLine:124, fontSize:100*scale, baselineOffset:Math.max(0, ascent*scale-86) };
-      applySettings();
-    }
-    function applySettings(){ const m=calculateGuideMetrics(); document.querySelectorAll('.guide').forEach(g=>{g.style.height='var(--guide-height)';g.style.setProperty('--guide-height','124px');}); document.querySelectorAll('.english-input').forEach(e=>{e.style.fontSize=m.fontSize+'px';e.style.fontFamily='EnglishPractice';}); document.querySelectorAll('.typed-layer').forEach(svg=>svg.setAttribute('viewBox','0 0 1000 124')); document.querySelectorAll('.typed-text').forEach(t=>{t.setAttribute('y',m.baseline);t.style.fontSize=m.fontSize+'px';}); document.querySelectorAll('.trace').forEach(e=>e.style.display=traceOn?'block':'none'); document.querySelectorAll('.korean-line').forEach(e=>e.style.display=koreanOn?'flex':'none'); }
-    document.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>{el.classList.toggle('on'); if(el.dataset.toggle==='trace')traceOn=el.classList.contains('on'); if(el.dataset.toggle==='korean')koreanOn=el.classList.contains('on'); applySettings();});
-    document.getElementById('addRow').onclick=()=>{rows.push(['Type a new sentence.', '새 문장의 뜻을 입력하세요.']);render();notify('새 문장을 추가했어요');};
-    document.getElementById('newDoc').onclick=()=>{rows=[['Type a new sentence.','새 문장의 뜻을 입력하세요.']];document.querySelector('.title').value='새 영어 학습지';render();notify('새 학습지를 만들었어요');};
-    document.getElementById('fullscreen').onclick=()=>document.documentElement.requestFullscreen?.();
-    document.getElementById('orientation').onchange=e=>document.getElementById('paper').style.maxWidth=e.target.value==='landscape'?'1200px':'850px';
-    render();
-    document.fonts.ready.then(calibrateFontMetrics);
-  </script>
+
+  <div class="grp" id="drawTools" hidden>
+    <button class="btn" id="tPen"   aria-pressed="true"  title="펜">✒️</button>
+    <button class="btn" id="tErase" aria-pressed="false" title="지우개">🧽</button>
+    <span class="lbl">색</span>
+    <button class="swatch" data-color="#1b2027" aria-pressed="true"  aria-label="검정"><span style="background:#1b2027"></span></button>
+    <button class="swatch" data-color="#e0322b" aria-pressed="false" aria-label="빨강"><span style="background:#e0322b"></span></button>
+    <button class="swatch" data-color="#1f6fd0" aria-pressed="false" aria-label="파랑"><span style="background:#1f6fd0"></span></button>
+    <button class="swatch" data-color="#1f9457" aria-pressed="false" aria-label="초록"><span style="background:#1f9457"></span></button>
+    <span class="lbl">굵기</span>
+    <button class="nib" data-w="4"  aria-pressed="false" aria-label="가늘게"><i style="width:5px;height:5px"></i></button>
+    <button class="nib" data-w="9"  aria-pressed="true"  aria-label="보통"><i style="width:10px;height:10px"></i></button>
+    <button class="nib" data-w="18" aria-pressed="false" aria-label="굵게"><i style="width:16px;height:16px"></i></button>
+    <button class="btn" id="undo" title="되돌리기" aria-label="필기 되돌리기" disabled>↩︎</button>
+    <button class="btn" id="clearInk" title="필기 전체 지우기" aria-label="필기 전체 지우기">전체 지우기</button>
+  </div>
+
+  <div class="grp" id="editTools">
+    <span class="lbl">표시 줄 수</span>
+    <div class="seg" role="group" id="lineCount" aria-label="한 화면에 보일 문장 수"></div>
+    <span class="lbl">예시 농도</span>
+    <input class="rng" id="dimAll" type="range" min="0" max="100" step="5" value="100" aria-label="모든 문장 예시 농도" />
+  </div>
+
+  <div class="grp end">
+    <select class="sel" id="orient" aria-label="인쇄 용지 방향">
+      <option value="portrait">A4 세로</option>
+      <option value="landscape">A4 가로</option>
+    </select>
+    <button class="btn ghost" id="print" title="인쇄" aria-label="인쇄">🖨</button>
+    <button class="btn ghost" id="full" title="전체 화면" aria-label="전체 화면">⛶</button>
+    <span class="dot" id="dot" role="status" aria-label="저장 상태"></span>
+  </div>
+</header>
+
+<main class="stage" id="stage">
+  <div class="sheet" id="sheet">
+    <div id="rows"></div>
+    <canvas id="ink" aria-label="필기 판서 영역"></canvas>
+  </div>
+</main>
+
+<button class="fab" id="addRow">＋ 문장 추가</button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="metrics" aria-hidden="true"></div>
+<style id="pageRule">@page{ size:A4 portrait; }</style>
+
+<script>
+'use strict';
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const clamp = (lo, v, hi) => Math.min(hi, Math.max(lo, v));
+
+/* ================= state ================= */
+const STORE = 'ehw.v2';
+const DEFAULTS = () => ({
+  title: '오늘의 문장',
+  lines: 1,
+  rows: [
+    { en:'The apple is red.',      ko:'그 사과는 빨간색입니다.',        dim:100 },
+    { en:'I like reading books.',  ko:'나는 책 읽는 것을 좋아합니다.',  dim:100 },
+    { en:'This is my classroom.',  ko:'여기는 나의 교실입니다.',        dim:100 }
+  ]
+});
+
+let state = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE);
+    if(!raw) return DEFAULTS();
+    const p = JSON.parse(raw);
+    if(!p || !Array.isArray(p.rows) || !p.rows.length) return DEFAULTS();
+    return {
+      title: typeof p.title === 'string' ? p.title : '오늘의 문장',
+      lines: clamp(1, Number(p.lines) || 1, 5),
+      rows: p.rows.map(r => ({
+        en: String(r && r.en || ''),
+        ko: String(r && r.ko || ''),
+        dim: clamp(0, Number(r && r.dim), 100) || (r && r.dim === 0 ? 0 : 100)
+      }))
+    };
+  }catch(e){ return DEFAULTS(); }
+}
+
+let saveTimer = null;
+function save(){
+  $('#dot').classList.add('pending');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){}
+    $('#dot').classList.remove('pending');
+  }, 300);
+}
+
+let toastTimer = null;
+function notify(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1700);
+}
+
+/* ================= font metrics ================= */
+/* Measure the real ink extents of the practice face so the four rules can be
+   derived from the font instead of hard-coded percentages. */
+const FONT = 'Andika, Georgia, "Times New Roman", serif';
+let FM = null;   // { a, x, d, cap }  — normalised to font-size 1
+
+function measureFont(){
+  const P = 200;
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = `400 ${P}px ${FONT}`;
+  const asc = s => ctx.measureText(s).actualBoundingBoxAscent;
+  const dsc = s => ctx.measureText(s).actualBoundingBoxDescent;
+  const cap = asc('H');
+  // The top rule is the CAPITAL line — that is how 4선 is taught here, so an
+  // uppercase letter fills the top zone exactly. Andika's ascenders run ~11%
+  // taller than its capitals and therefore rise past it; the gap between
+  // blocks is sized below to swallow that instead of letting them collide.
+  const ascender = Math.max(cap, asc('bdfhklt'));
+  // flat-topped letters only. Round tops (a c e o s) and arch shoulders (n m r)
+  // overshoot x-height by ~1.5% by design, so they must not set the rule.
+  const x = asc('xzvwu');
+  const d = Math.max(dsc('gjpqy'), P * 0.12);   // guard against fonts reporting ~0
+  FM = { cap:cap/P, ascender:ascender/P, x:x/P, d:d/P };
+}
+
+/* Where the baseline actually falls inside a line box of the given metrics.
+   A zero-height inline-block sits with its bottom edge on the baseline. */
+function baselineInLineBox(fontPx, linePx){
+  const m = $('#metrics');
+  m.style.font = `400 ${fontPx}px/${linePx}px ${FONT}`;
+  m.textContent = '';
+  const probe = document.createElement('span');
+  probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+  m.appendChild(probe);
+  m.appendChild(document.createTextNode('Hxy'));
+  const off = probe.getBoundingClientRect().top - m.getBoundingClientRect().top;
+  m.textContent = '';
+  return off;
+}
+
+/* ================= layout ================= */
+const root = document.documentElement;
+let GEO = { band:120, blockH:104, F:64, L2:40, L3:80, rowH:200 };
+
+/* band = F * K — the four-rule block plus the gap under it. The gap must be at
+   least as deep as the ascender overshoot, or the next line's b/d/f/h/k/l would
+   cut through this block's bottom rule. */
+const K = () => {
+  const block = FM.cap + FM.d;
+  return block + Math.max(0.163 * block, (FM.ascender - FM.cap) + 0.06);
+};
+
+const measureCtx = document.createElement('canvas').getContext('2d');
+function widthAtSize1(text){
+  measureCtx.font = `400 100px ${FONT}`;
+  return measureCtx.measureText(text || '').width / 100;
+}
+
+/* The ruling has to satisfy two budgets at once: the vertical slot the row owns,
+   and the width of the sheet. Pick the largest size that fits the longest
+   sentence in at most `maxWrap` ruled lines. */
+function computeGeometry(rowBudget, availW, maxWrap){
+  const W1 = Math.max(0.05, ...state.rows.map(r => widthAtSize1(r.en || 'Type a sentence…')));
+  const k = K();
+  let F = 0;
+  for(let n = 1; n <= maxWrap; n++){
+    F = Math.max(F, Math.min(n * availW / W1, rowBudget / (n * k)));
+  }
+  F = clamp(16, F, 320);
+  const band   = F * k;
+  const blockH = F * (FM.cap + FM.d);
+  return { band, blockH, F, L2:(FM.cap - FM.x) * F, L3:FM.cap * F };
+}
+
+function layout(opts){
+  if(!FM) return;
+  const printing = !!(opts && opts.print);
+  const stage = $('#stage');
+  const probe = $('.guide');
+  const availW = (probe ? probe.clientWidth : $('#sheet').clientWidth - 52) * 0.97;
+
+  const rowH = printing
+    ? 190
+    : Math.max(150, (stage.clientHeight - 40) / state.lines - 14);
+
+  // give the Korean gloss only what it needs; the four rules get everything else.
+  // availW/14 keeps a typical gloss on one line instead of wrapping on phones.
+  const koPx = clamp(20, Math.min(rowH * 0.30 * 0.52, availW / 14), 64);
+  const guideBudget = Math.max(90, rowH - (koPx * 1.35 + 12));
+
+  const g = computeGeometry(guideBudget, availW, printing ? 3 : (state.lines === 1 ? 3 : 2));
+  GEO = Object.assign(g, { rowH });
+
+  // The baseline rule is painted at (O + L3); park it on the line box's real
+  // baseline so every wrapped line inherits the same alignment.
+  const bo = baselineInLineBox(g.F, g.band);
+  const O  = ((bo - g.L3) % g.band + g.band) % g.band;
+  const p  = n => `0 ${n.toFixed(2)}px`;
+
+  root.style.setProperty('--F', g.F.toFixed(2) + 'px');
+  root.style.setProperty('--band', g.band.toFixed(2) + 'px');
+  root.style.setProperty('--gpos',
+    [ p(O), p(O + g.L2), p(O + g.L3), p(O + g.blockH - 2) ].join(', '));
+  root.style.setProperty('--ko', koPx.toFixed(1) + 'px');
+  root.style.setProperty('--rowH', printing ? 'auto' : rowH.toFixed(0) + 'px');
+
+  sizeCanvas();
+}
+
+/* ================= rows ================= */
+const rowsEl = $('#rows');
+
+function applyDim(row, i){
+  const el = row.querySelector('.guide');
+  const v  = state.rows[i].dim;
+  const eff = (document.activeElement === el) ? Math.max(v, 35) : v;
+  el.style.color = `rgba(17, 20, 26, ${eff / 100})`;
+}
+
+function makeRow(item, i){
+  const row = document.createElement('div');
+  row.className = 'row';
+
+  const en = document.createElement('div');
+  en.className = 'guide';
+  en.lang = 'en';
+  en.spellcheck = false;
+  en.setAttribute('role', 'textbox');
+  en.setAttribute('aria-label', `영어 문장 ${i + 1}`);
+  en.dataset.ph = 'Type a sentence…';
+  setEditable(en);
+  en.textContent = item.en;                     // textContent — never innerHTML
+
+  const ko = document.createElement('div');
+  ko.className = 'ko';
+  ko.setAttribute('role', 'textbox');
+  ko.setAttribute('aria-label', `한글 뜻 ${i + 1}`);
+  ko.dataset.ph = '한글 뜻';
+  setEditable(ko);
+  ko.textContent = item.ko;
+
+  const tools = document.createElement('div');
+  tools.className = 'rowtools';
+
+  const num = document.createElement('span');
+  num.className = 'num';
+  num.textContent = String(i + 1).padStart(2, '0');
+
+  const dim = document.createElement('input');
+  dim.type = 'range'; dim.className = 'rng';
+  dim.min = 0; dim.max = 100; dim.step = 5; dim.value = item.dim;
+  dim.title = '예시 농도 (0 숨김 · 30 회색 · 100 검정)';
+  dim.setAttribute('aria-label', `문장 ${i + 1} 예시 농도`);
+
+  const speak = mkBtn('🔊', `문장 ${i + 1} 읽기`);
+  const del   = mkBtn('✕',  `문장 ${i + 1} 삭제`);
+
+  tools.append(num, dim, speak, del);
+  row.append(tools, en, ko);
+
+  /* --- behaviour --- */
+  en.addEventListener('input', () => { state.rows[i].en = en.textContent; save(); });
+  ko.addEventListener('input', () => { state.rows[i].ko = ko.textContent; save(); });
+  en.addEventListener('focus', () => applyDim(row, i));
+  en.addEventListener('blur',  () => applyDim(row, i));
+  [en, ko].forEach(el => el.addEventListener('paste', onPastePlain));
+
+  dim.addEventListener('input', () => {
+    const v = Number(dim.value);
+    state.rows[i].dim = v;
+    // snap to the three meaningful stops so the teacher can hit them reliably
+    if(v > 0 && v < 15) dim.value = state.rows[i].dim = 0;
+    else if(v >= 25 && v <= 35) dim.value = state.rows[i].dim = 30;
+    else if(v > 92) dim.value = state.rows[i].dim = 100;
+    applyDim(row, i); save();
+  });
+
+  speak.onclick = () => speakText(state.rows[i].en);
+  del.onclick = () => {
+    if(state.rows.length <= 1){ notify('마지막 문장은 삭제할 수 없어요.'); return; }
+    state.rows.splice(i, 1); render(); save(); notify('문장을 삭제했어요.');
+  };
+
+  applyDim(row, i);
+  return row;
+}
+
+function mkBtn(glyph, label){
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = glyph;
+  b.title = label; b.setAttribute('aria-label', label);
+  return b;
+}
+
+function setEditable(el){
+  el.setAttribute('contenteditable', 'plaintext-only');
+  // Firefox < 136 rejects plaintext-only and reports "inherit"
+  if(el.contentEditable !== 'plaintext-only') el.setAttribute('contenteditable', 'true');
+}
+
+function onPastePlain(e){
+  const txt = (e.clipboardData || window.clipboardData).getData('text/plain');
+  e.preventDefault();
+  document.execCommand('insertText', false, txt.replace(/\s*\n\s*/g, ' '));
+}
+
+function render(){
+  rowsEl.textContent = '';
+  state.rows.forEach((r, i) => rowsEl.appendChild(makeRow(r, i)));
+  layout();
+}
+
+/* ================= speech (secondary feature) ================= */
+function speakText(text){
+  if(!text.trim()) return notify('읽을 문장을 먼저 입력하세요.');
+  if(!('speechSynthesis' in window)) return notify('이 브라우저는 음성을 지원하지 않아요.');
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US'; u.rate = 0.85;
+  speechSynthesis.speak(u);
+  notify('문장을 읽고 있어요');
+}
+
+/* ================= ink ================= */
+const canvas = $('#ink');
+const cx = canvas.getContext('2d');
+let strokes = [];            // { color, w, pts:[{x,y}] }  — document coordinates
+let history = [];            // snapshots for undo
+let cur = null;
+let tool = 'pen', penColor = '#1b2027', penW = 9;
+
+function sizeCanvas(){
+  const sheet = $('#sheet');
+  const w = sheet.offsetWidth, h = sheet.offsetHeight;
+  if(!w || !h) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  redraw();
+}
+
+function redraw(){
+  cx.clearRect(0, 0, canvas.width, canvas.height);
+  cx.lineCap = 'round'; cx.lineJoin = 'round';
+  for(const s of strokes) drawStroke(s);
+}
+
+function drawStroke(s){
+  const p = s.pts;
+  cx.strokeStyle = s.color; cx.lineWidth = s.w;
+  cx.beginPath();
+  if(p.length === 1){
+    cx.arc(p[0].x, p[0].y, s.w / 2, 0, Math.PI * 2);
+    cx.fillStyle = s.color; cx.fill();
+    return;
+  }
+  cx.moveTo(p[0].x, p[0].y);
+  for(let i = 1; i < p.length - 1; i++){
+    const m = { x:(p[i].x + p[i+1].x) / 2, y:(p[i].y + p[i+1].y) / 2 };
+    cx.quadraticCurveTo(p[i].x, p[i].y, m.x, m.y);   // midpoint smoothing
+  }
+  cx.lineTo(p[p.length-1].x, p[p.length-1].y);
+  cx.stroke();
+}
+
+function ptOf(e){
+  const r = canvas.getBoundingClientRect();
+  return { x:e.clientX - r.left, y:e.clientY - r.top };
+}
+
+function pushHistory(){
+  history.push(strokes.map(s => ({ color:s.color, w:s.w, pts:s.pts })));
+  if(history.length > 60) history.shift();
+  $('#undo').disabled = false;
+}
+
+function eraseAt(p){
+  const R = 22;
+  const before = strokes.length;
+  strokes = strokes.filter(s => !s.pts.some(q => Math.hypot(q.x - p.x, q.y - p.y) < R + s.w / 2));
+  if(strokes.length !== before) redraw();
+  return strokes.length !== before;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if(!document.body.classList.contains('mode-draw')) return;
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  const p = ptOf(e);
+  if(tool === 'erase'){ pushHistory(); eraseAt(p); cur = { erasing:true }; return; }
+  pushHistory();
+  cur = { color:penColor, w:penW, pts:[p] };
+  strokes.push(cur);
+  drawStroke(cur);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if(!cur) return;
+  e.preventDefault();
+  if(cur.erasing){ eraseAt(ptOf(e)); return; }
+  const evts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for(const ev of evts) cur.pts.push(ptOf(ev));
+  redraw();
+});
+
+function endStroke(e){
+  if(!cur) return;
+  if(e && canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  cur = null;
+}
+canvas.addEventListener('pointerup', endStroke);
+canvas.addEventListener('pointercancel', endStroke);   // note: NOT pointerleave
+
+$('#undo').onclick = () => {
+  if(!history.length) return;
+  strokes = history.pop();
+  $('#undo').disabled = !history.length;
+  redraw();
+};
+$('#clearInk').onclick = () => {
+  if(!strokes.length) return notify('지울 필기가 없어요.');
+  pushHistory(); strokes = []; redraw(); notify('필기를 모두 지웠어요.');
+};
+
+/* ================= toolbar wiring ================= */
+function setMode(m){
+  document.body.classList.toggle('mode-draw', m === 'draw');
+  document.body.classList.toggle('mode-edit', m === 'edit');
+  $('#mEdit').setAttribute('aria-pressed', String(m === 'edit'));
+  $('#mDraw').setAttribute('aria-pressed', String(m === 'draw'));
+  $('#drawTools').hidden = (m !== 'draw');
+  $('#editTools').hidden = (m === 'draw');
+  $$('.guide, .ko').forEach(el => {
+    if(m === 'draw') el.setAttribute('contenteditable', 'false');
+    else setEditable(el);
+  });
+  if(m === 'draw' && document.activeElement) document.activeElement.blur();
+}
+$('#mEdit').onclick = () => setMode('edit');
+$('#mDraw').onclick = () => setMode('draw');
+
+$('#tPen').onclick   = () => { tool = 'pen';   $('#tPen').setAttribute('aria-pressed','true');  $('#tErase').setAttribute('aria-pressed','false'); };
+$('#tErase').onclick = () => { tool = 'erase'; $('#tPen').setAttribute('aria-pressed','false'); $('#tErase').setAttribute('aria-pressed','true');  };
+
+$$('.swatch').forEach(b => b.onclick = () => {
+  penColor = b.dataset.color; tool = 'pen';
+  $('#tPen').setAttribute('aria-pressed','true'); $('#tErase').setAttribute('aria-pressed','false');
+  $$('.swatch').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+});
+$$('.nib').forEach(b => b.onclick = () => {
+  penW = Number(b.dataset.w);
+  $$('.nib').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+});
+
+/* 표시 줄 수 — this is also the size control: fewer lines ⇒ bigger ruling */
+const lc = $('#lineCount');
+for(let n = 1; n <= 5; n++){
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = String(n);
+  b.setAttribute('aria-label', `한 화면에 ${n}문장`);
+  b.setAttribute('aria-pressed', String(n === state.lines));
+  b.onclick = () => {
+    state.lines = n;
+    $$('button', lc).forEach((o, i) => o.setAttribute('aria-pressed', String(i + 1 === n)));
+    document.body.classList.toggle('snap', n === 1);
+    layout(); save();
+  };
+  lc.appendChild(b);
+}
+
+$('#dimAll').oninput = e => {
+  const v = Number(e.target.value);
+  state.rows.forEach(r => r.dim = v);
+  $$('.rowtools .rng').forEach(r => r.value = v);
+  $$('.row').forEach((row, i) => applyDim(row, i));
+  save();
+};
+
+$('#addRow').onclick = () => {
+  state.rows.push({ en:'', ko:'', dim:100 });
+  render(); save();
+  const last = $$('.guide').pop();
+  if(last){ last.focus(); last.scrollIntoView({ behavior:'smooth', block:'center' }); }
+};
+
+$('#title').value = state.title;
+$('#title').addEventListener('input', e => { state.title = e.target.value; save(); });
+
+$('#orient').onchange = e => {
+  $('#pageRule').textContent = `@page{ size:A4 ${e.target.value}; }`;
+};
+
+$('#print').onclick = () => window.print();
+$('#full').onclick = () => {
+  if(document.fullscreenElement) document.exitFullscreen?.();
+  else document.documentElement.requestFullscreen?.().catch(() => notify('전체 화면을 사용할 수 없어요.'));
+};
+
+window.addEventListener('beforeprint', () => layout({ print:true }));
+window.addEventListener('afterprint',  () => layout());
+
+/* keep geometry in sync with the viewport / rotation */
+let roTimer = null;
+new ResizeObserver(() => { clearTimeout(roTimer); roTimer = setTimeout(() => layout(), 60); })
+  .observe($('#stage'));
+
+/* ================= boot ================= */
+async function boot(){
+  document.body.classList.toggle('snap', state.lines === 1);
+  try{
+    await Promise.all([
+      document.fonts.load(`400 200px Andika`),
+      document.fonts.load(`700 200px Andika`)
+    ]);
+    await document.fonts.ready;
+  }catch(e){ /* fall back to the serif stack */ }
+  measureFont();
+  render();
+  // second pass: the sheet height is only final once rows exist
+  requestAnimationFrame(() => { layout(); sizeCanvas(); });
+}
+boot();
+
+/* Offline support. Guarded on protocol because registering from file:// throws,
+   and teachers do open the file directly when testing. */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+
+/* exposed for the verification harness */
+window.__app = {
+  get state(){ return state; },
+  get geo(){ return GEO; },
+  get fm(){ return FM; },
+  get strokes(){ return strokes; }
+};
+</script>
 </body>
 </html>
