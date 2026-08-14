@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f6f7fb" />
+  <title>노트 — 영어 필기 수업 도구</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    @font-face { font-family:EnglishPractice; src:url('./fonts/Kalam-Bold.ttf') format('truetype'); font-weight:700; font-display:block; }
+    :root { --ink:#20252d; --muted:#7c8491; --line:#b8c0cc; --blue:#6bb6e6; --blue-deep:#2176ae; --orange:#eb6536; --paper:#fff; --bg:#f3f5f8; --sidebar:268px; --guide-height:124px; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Pretendard,system-ui,sans-serif; }
+    button,input { font:inherit; }
+    button { cursor:pointer; border:0; }
+    .app { min-height:100vh; display:grid; grid-template-columns:var(--sidebar) 1fr; }
+    .sidebar { background:#fff; border-right:1px solid #e1e5ea; padding:27px 18px; display:flex; flex-direction:column; gap:25px; }
+    .brand { display:flex; align-items:center; gap:11px; font-weight:800; font-size:23px; letter-spacing:-.06em; padding:0 10px; }
+    .brand-mark { width:31px; height:37px; border:2px solid var(--ink); border-radius:6px; display:grid; place-items:center; position:relative; background:#f9fbfd; }
+    .brand-mark:before { content:'Aa'; color:#3488be; font-weight:900; font-size:11px; border:1px solid #d3dce6; padding:2px; }
+    .brand-mark:after { content:''; position:absolute; left:5px; right:5px; bottom:5px; height:2px; background:#9da8b4; box-shadow:0 -4px #9da8b4,0 -8px #9da8b4; }
+    .new-btn { background:var(--orange); color:white; border-radius:12px; padding:13px 15px; font-weight:750; display:flex; align-items:center; gap:9px; box-shadow:0 5px 12px #eb65362b; }
+    .plus { font-size:24px; line-height:16px; font-weight:300; }
+    .side-label { color:#a1a9b5; font-size:12px; font-weight:700; padding:0 10px; margin-bottom:-12px; }
+    .doc-list { display:flex; flex-direction:column; gap:6px; }
+    .doc { padding:12px 12px; border-radius:10px; display:flex; gap:10px; align-items:center; color:#515a67; }
+    .doc.active { background:#fff1eb; color:#d9552c; font-weight:700; }
+    .doc-icon { font-size:17px; } .doc small { display:block; font-size:11px; color:#a1a9b5; margin-top:3px; font-weight:500; }
+    .sidebar-foot { margin-top:auto; color:#89929f; font-size:12px; line-height:1.6; padding:10px; }
+    .main { min-width:0; }
+    .topbar { height:75px; background:#fff; border-bottom:1px solid #e1e5ea; display:flex; align-items:center; justify-content:space-between; padding:0 28px; gap:20px; }
+    .title { border:0; outline:0; font-size:25px; font-weight:800; color:#252a31; min-width:220px; letter-spacing:-.04em; background:transparent; }
+    .title::placeholder { color:#b4bbc4; }
+    .top-actions,.toolbar-actions { display:flex; align-items:center; gap:8px; }
+    .icon-btn { width:39px; height:39px; border-radius:10px; background:#f5f7f9; color:#596473; font-size:18px; display:grid; place-items:center; }
+    .icon-btn:hover { background:#e9eef3; } .icon-btn.orange { color:var(--orange); background:#fff0eb; }
+    .toolbar { min-height:72px; background:#fff; border-bottom:1px solid #e0e4e9; padding:13px 28px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+    .tool-group { display:flex; align-items:center; gap:8px; padding-right:20px; border-right:1px solid #e6e9ed; }
+    .tool-group:last-child { border:0; margin-left:auto; padding-right:0; }
+    .tool-label { color:#7a8490; font-size:12px; font-weight:700; }
+    .select,.range { border:1px solid #dce2e8; background:#fff; border-radius:8px; padding:9px 11px; color:#3f4854; }
+    .range { width:105px; accent-color:var(--orange); padding:0; }
+    .toggle { display:flex; align-items:center; gap:8px; color:#505a66; font-size:13px; font-weight:650; }
+    .switch { width:38px; height:22px; border-radius:20px; background:#c7ced7; padding:3px; transition:.2s; }
+    .switch:before { content:''; display:block; width:16px; height:16px; border-radius:50%; background:#fff; transition:.2s; box-shadow:0 1px 3px #0002; }
+    .switch.on { background:var(--orange); } .switch.on:before { transform:translateX(16px); }
+    .canvas-wrap { padding:25px 34px 80px; overflow:auto; }
+    .paper { max-width:1200px; min-height:780px; margin:0 auto; background:var(--paper); border:1px solid #e6e9ed; box-shadow:0 15px 38px #2633420d; border-radius:5px; padding:34px 48px 70px; }
+    .paper-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:26px; }
+    .paper-kicker { font-size:12px; color:var(--orange); font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .paper h1 { margin:6px 0 0; font-size:28px; letter-spacing:-.05em; }
+    .paper-note { color:#9ca5af; font-size:12px; text-align:right; line-height:1.6; }
+    .row { position:relative; margin:24px 0 28px; padding:0 62px 0 18px; }
+    .row-number { position:absolute; left:0; top:9px; color:#b2bac4; font-size:11px; font-weight:800; }
+    .guide { position:relative; height:var(--guide-height); border-top:2px solid #929ca7; border-bottom:2px solid #929ca7; background:linear-gradient(to bottom, transparent 0, transparent calc(34.7% - 1px), var(--line) calc(34.7% - 1px), var(--line) calc(34.7% + 1px), transparent calc(34.7% + 1px), transparent calc(69.4% - 1px), var(--blue) calc(69.4% - 1px), var(--blue) calc(69.4% + 1px), transparent calc(69.4% + 1px)); }
+    .guide:after { content:''; position:absolute; left:0; right:0; top:34.7%; border-top:2px dashed #aab2bc; opacity:.95; }
+    .english-input { position:absolute; left:14px; right:12px; top:0; height:100%; border:0; outline:0; background:transparent; color:transparent; caret-color:#222a33; font-family:EnglishPractice,sans-serif; font-size:100px; line-height:1; font-weight:700; letter-spacing:0; z-index:5; pointer-events:auto; }
+    .english-input::placeholder { color:transparent; }
+    .typed-layer { position:absolute; left:14px; right:12px; top:0; width:calc(100% - 26px); height:100%; overflow:visible; pointer-events:none; z-index:4; }
+    .typed-layer text { fill:#050505; font-family:EnglishPractice,sans-serif; font-weight:700; letter-spacing:0; dominant-baseline:alphabetic; }
+    .trace { display:none; position:absolute; left:14px; top:0; color:#9fb4c5; opacity:.32; font-size:43px; line-height:1.45; pointer-events:none; letter-spacing:-.035em; }
+    .stroke-layer { position:absolute; inset:0; width:100%; height:100%; z-index:3; touch-action:none; cursor:crosshair; }
+    .korean-line { margin-top:9px; display:flex; align-items:center; gap:12px; color:#77818d; font-size:17px; }
+    .korean-line input { border:0; border-bottom:1px solid #dce1e6; outline:0; flex:1; color:#5f6a77; padding:5px 2px; background:transparent; }
+    .row-tools { position:absolute; right:0; top:7px; display:flex; flex-direction:column; gap:7px; opacity:0; transition:.15s; }
+    .row:hover .row-tools,.row:focus-within .row-tools { opacity:1; }
+    .row-tools button { width:34px; height:34px; border-radius:9px; background:#f2f5f7; color:#62707d; }
+    .row-tools button:hover { color:var(--orange); background:#fff0eb; }
+    .floating { position:fixed; right:30px; bottom:28px; width:58px; height:58px; border-radius:50%; background:#20252d; color:white; font-size:30px; box-shadow:0 8px 22px #20252d35; }
+    .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); opacity:0; pointer-events:none; background:#20252d; color:#fff; padding:11px 17px; border-radius:999px; font-size:13px; transition:.25s; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    @media (max-width:1100px) {
+      :root { --sidebar:0px; }
+      .sidebar { display:none; }
+      .topbar { height:64px; padding:0 18px; }
+      .title { font-size:20px; }
+      .toolbar { min-height:62px; padding:10px 18px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; gap:14px; scrollbar-width:thin; }
+      .toolbar .tool-group { flex:0 0 auto; min-width:max-content; padding-right:14px; }
+      .toolbar .tool-group:last-child { margin-left:0; }
+      .tool-label { white-space:nowrap; }
+      .toggle { white-space:nowrap; }
+      .canvas-wrap { padding:16px 14px 70px; }
+      .paper { padding:25px 24px 55px; }
+      .paper-head { margin-bottom:18px; }
+    }
+    @media (max-width:700px) {
+      .topbar { padding:0 12px; }
+      .title { min-width:0; width:170px; font-size:18px; }
+      .top-actions { gap:4px; }
+      .icon-btn { width:34px; height:34px; }
+      .canvas-wrap { padding:10px 6px 64px; }
+      .paper { padding:20px 14px 46px; border-radius:3px; }
+      .paper h1 { font-size:22px; }
+      .paper-note { display:none; }
+      .row { padding-right:38px; margin:18px 0 22px; }
+      .english-input { font-size:72px; }
+      .typed-layer text { font-size:72px; }
+      .row-tools { right:-2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark"></span><span>노트</span></div>
+      <button class="new-btn" id="newDoc"><span class="plus">＋</span> 새 학습지</button>
+      <div class="side-label">최근 문서</div>
+      <div class="doc-list">
+        <div class="doc active"><span class="doc-icon">▤</span><span>초등 영어 4선<small>방금 전 저장됨</small></span></div>
+        <div class="doc"><span class="doc-icon">▤</span><span>My family<small>어제 오후 3:12</small></span></div>
+        <div class="doc"><span class="doc-icon">▤</span><span>Daily sentences<small>8월 12일</small></span></div>
+      </div>
+      <div class="sidebar-foot">전자칠판에서 쓰고,<br>문장을 눌러 바로 들어보세요.</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <input class="title" value="초등 영어 4선" aria-label="문서 제목" />
+        <div class="top-actions">
+          <button class="icon-btn" title="전체 화면" id="fullscreen">⛶</button>
+          <button class="icon-btn" title="설정">⚙</button>
+          <button class="icon-btn orange" title="인쇄" onclick="window.print()">▣</button>
+        </div>
+      </header>
+      <section class="toolbar">
+        <div class="tool-group"><span class="tool-label">4선 규격</span><span class="select">기본 좁은 규격</span></div>
+        <div class="tool-group"><label class="toggle"><span class="switch on" data-toggle="trace"></span> 회색 따라쓰기</label><label class="toggle"><span class="switch on" data-toggle="korean"></span> 한글 뜻</label></div>
+        <div class="tool-group"><span class="tool-label">용지</span><select class="select" id="orientation"><option value="portrait">A4 세로</option><option value="landscape" selected>A4 가로</option></select></div>
+        <div class="tool-group"><span class="tool-label">자동 저장됨</span><span style="color:#3c9c70;font-weight:800;font-size:14px">●</span></div>
+      </section>
+      <div class="canvas-wrap">
+        <section class="paper" id="paper">
+          <div class="paper-head"><div><div class="paper-kicker">English handwriting practice</div><h1>오늘의 문장</h1></div><div class="paper-note">4선에 맞춰 타이핑하고<br>전자칠판에 직접 써보세요</div></div>
+          <div id="rows"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <button class="floating" id="addRow" aria-label="문장 추가">＋</button>
+  <div class="toast" id="toast"></div>
+  <script>
+    const initial = [
+      ['The apple is red.', '그 사과는 빨간색입니다.'],
+      ['I like reading books.', '나는 책 읽는 것을 좋아합니다.'],
+      ['This is my classroom.', '여기는 나의 교실입니다.']
+    ];
+    let rows = [...initial]; let traceOn = true; let koreanOn = true; let drawing = false; let activeSvg = null; let activePath = null;
+    const rowsEl = document.getElementById('rows'), toast = document.getElementById('toast');
+    function notify(text){ toast.textContent=text; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1800); }
+    function speak(text){ if(!text.trim()) return notify('읽을 문장을 먼저 입력하세요.'); if('speechSynthesis' in window){ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; u.rate=0.9; speechSynthesis.speak(u); notify('문장을 읽고 있어요'); } else notify('이 브라우저에서는 음성을 지원하지 않아요.'); }
+    function makeRow(item, i){
+      const row=document.createElement('div'); row.className='row'; row.innerHTML=`<span class="row-number">${String(i+1).padStart(2,'0')}</span><div class="guide"><span class="trace">${item[0]}</span><svg class="typed-layer" viewBox="0 0 1000 124" preserveAspectRatio="none"><text class="typed-text" x="0" y="86">${item[0]}</text></svg><input class="english-input" value="${item[0]}" aria-label="영어 문장 ${i+1}"/><svg class="stroke-layer" viewBox="0 0 1000 124" preserveAspectRatio="none"></svg></div><div class="korean-line"><span>한글</span><input value="${item[1]}" aria-label="한글 뜻 ${i+1}"/></div><div class="row-tools"><button title="문장 읽기" class="speak">🔊</button><button title="필기 인식 후 읽기" class="ocr">✦</button><button title="행 삭제" class="remove">×</button></div>`;
+      const input=row.querySelector('.english-input'), trace=row.querySelector('.trace'), typed=row.querySelector('.typed-text'), guide=row.querySelector('.guide');
+      input.addEventListener('input',()=>{trace.textContent=input.value; typed.textContent=input.value; rows[i][0]=input.value; notify('자동 저장됨');});
+      row.querySelector('.korean-line input').addEventListener('input',e=>rows[i][1]=e.target.value);
+      row.querySelector('.speak').onclick=()=>speak(input.value);
+      row.querySelector('.ocr').onclick=()=>notify('필기 인식 API 연결 자리예요');
+      row.querySelector('.remove').onclick=()=>{ if(rows.length>1){rows.splice(i,1); render();} };
+      const svg=row.querySelector('svg');
+      svg.addEventListener('pointerdown',e=>{ drawing=true; activeSvg=svg; const p=svg.createSVGPoint(); p.x=e.offsetX; p.y=e.offsetY; activePath=document.createElementNS('http://www.w3.org/2000/svg','path'); activePath.setAttribute('fill','none'); activePath.setAttribute('stroke','#26313c'); activePath.setAttribute('stroke-width','4'); activePath.setAttribute('stroke-linecap','round'); activePath.setAttribute('d',`M ${p.x} ${p.y}`); svg.appendChild(activePath); svg.setPointerCapture(e.pointerId); });
+      svg.addEventListener('pointermove',e=>{ if(!drawing||activeSvg!==svg)return; const p=svg.createSVGPoint(); p.x=e.offsetX; p.y=e.offsetY; activePath.setAttribute('d',activePath.getAttribute('d')+` L ${p.x} ${p.y}`); });
+      ['pointerup','pointercancel','pointerleave'].forEach(ev=>svg.addEventListener(ev,()=>{drawing=false;activeSvg=null;activePath=null;}));
+      return row;
+    }
+    function render(){rowsEl.innerHTML=''; rows.forEach((r,i)=>rowsEl.appendChild(makeRow(r,i))); applySettings();}
+    let guideMetrics = { topLine:0, midLine:43, baseline:86, bottomLine:124, fontSize:100, baselineOffset:0 };
+    function calculateGuideMetrics(){ return guideMetrics; }
+    function calibrateFontMetrics(){
+      const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+      ctx.font='700 100px EnglishPractice';
+      const x=ctx.measureText('x'), H=ctx.measureText('H'), y=ctx.measureText('y');
+      const xHeight=x.actualBoundingBoxAscent||53, ascent=H.actualBoundingBoxAscent||76, descent=y.actualBoundingBoxDescent||22;
+      const scale=43/xHeight;
+      guideMetrics={ topLine:0, midLine:43, baseline:86, bottomLine:124, fontSize:100*scale, baselineOffset:Math.max(0, ascent*scale-86) };
+      applySettings();
+    }
+    function applySettings(){ const m=calculateGuideMetrics(); document.querySelectorAll('.guide').forEach(g=>{g.style.height='var(--guide-height)';g.style.setProperty('--guide-height','124px');}); document.querySelectorAll('.english-input').forEach(e=>{e.style.fontSize=m.fontSize+'px';e.style.fontFamily='EnglishPractice';}); document.querySelectorAll('.typed-layer').forEach(svg=>svg.setAttribute('viewBox','0 0 1000 124')); document.querySelectorAll('.typed-text').forEach(t=>{t.setAttribute('y',m.baseline);t.style.fontSize=m.fontSize+'px';}); document.querySelectorAll('.trace').forEach(e=>e.style.display=traceOn?'block':'none'); document.querySelectorAll('.korean-line').forEach(e=>e.style.display=koreanOn?'flex':'none'); }
+    document.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>{el.classList.toggle('on'); if(el.dataset.toggle==='trace')traceOn=el.classList.contains('on'); if(el.dataset.toggle==='korean')koreanOn=el.classList.contains('on'); applySettings();});
+    document.getElementById('addRow').onclick=()=>{rows.push(['Type a new sentence.', '새 문장의 뜻을 입력하세요.']);render();notify('새 문장을 추가했어요');};
+    document.getElementById('newDoc').onclick=()=>{rows=[['Type a new sentence.','새 문장의 뜻을 입력하세요.']];document.querySelector('.title').value='새 영어 학습지';render();notify('새 학습지를 만들었어요');};
+    document.getElementById('fullscreen').onclick=()=>document.documentElement.requestFullscreen?.();
+    document.getElementById('orientation').onchange=e=>document.getElementById('paper').style.maxWidth=e.target.value==='landscape'?'1200px':'850px';
+    render();
+    document.fonts.ready.then(calibrateFontMetrics);
+  </script>
+</body>
+</html>
