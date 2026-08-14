@@ -1,0 +1,18 @@
+{
+  "name": "영어 4선 칠판",
+  "short_name": "4선 칠판",
+  "description": "전자칠판에 영어 예시 문장을 4선에 맞춰 크게 띄우고 그 위에 직접 판서하는 수업 도구.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef1f5",
+  "theme_color": "#eef1f5",
+  "categories": ["education"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

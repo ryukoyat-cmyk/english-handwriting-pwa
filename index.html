@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#eef1f5" />
 <title>영어 4선 칠판</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="4선 칠판" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23fff'/%3E%3Cg stroke='%238f9bab' stroke-width='1.6'%3E%3Cpath d='M3 7h26M3 25h26'/%3E%3C/g%3E%3Cpath d='M3 13h26' stroke='%23b6c3d2' stroke-width='1.2'/%3E%3Cpath d='M3 19h26' stroke='%234a9fd8' stroke-width='1.6'/%3E%3Ctext x='16' y='19' font-family='Georgia,serif' font-size='15' text-anchor='middle' fill='%231b2027'%3EAa%3C/text%3E%3C/svg%3E" />
 <style>
   @font-face { font-family:Andika; src:url('./fonts/Andika-Regular.woff2') format('woff2'); font-weight:400; font-display:swap; }
@@ -274,12 +280,16 @@ function measureFont(){
   const asc = s => ctx.measureText(s).actualBoundingBoxAscent;
   const dsc = s => ctx.measureText(s).actualBoundingBoxDescent;
   const cap = asc('H');
-  const a = Math.max(cap, asc('bdfhklt'));      // tallest ascender bounds the top rule
+  // The top rule is the CAPITAL line — that is how 4선 is taught here, so an
+  // uppercase letter fills the top zone exactly. Andika's ascenders run ~11%
+  // taller than its capitals and therefore rise past it; the gap between
+  // blocks is sized below to swallow that instead of letting them collide.
+  const ascender = Math.max(cap, asc('bdfhklt'));
   // flat-topped letters only. Round tops (a c e o s) and arch shoulders (n m r)
   // overshoot x-height by ~1.5% by design, so they must not set the rule.
   const x = asc('xzvwu');
   const d = Math.max(dsc('gjpqy'), P * 0.12);   // guard against fonts reporting ~0
-  FM = { a:a/P, x:x/P, d:d/P, cap:cap/P };
+  FM = { cap:cap/P, ascender:ascender/P, x:x/P, d:d/P };
 }
 
 /* Where the baseline actually falls inside a line box of the given metrics.
@@ -301,7 +311,13 @@ function baselineInLineBox(fontPx, linePx){
 const root = document.documentElement;
 let GEO = { band:120, blockH:104, F:64, L2:40, L3:80, rowH:200 };
 
-const K = () => (FM.a + FM.d) / 0.86;      // band = F * K  (block plus breathing gap)
+/* band = F * K — the four-rule block plus the gap under it. The gap must be at
+   least as deep as the ascender overshoot, or the next line's b/d/f/h/k/l would
+   cut through this block's bottom rule. */
+const K = () => {
+  const block = FM.cap + FM.d;
+  return block + Math.max(0.163 * block, (FM.ascender - FM.cap) + 0.06);
+};
 
 const measureCtx = document.createElement('canvas').getContext('2d');
 function widthAtSize1(text){
@@ -321,8 +337,8 @@ function computeGeometry(rowBudget, availW, maxWrap){
   }
   F = clamp(16, F, 320);
   const band   = F * k;
-  const blockH = F * (FM.a + FM.d);
-  return { band, blockH, F, L2:(FM.a - FM.x) * F, L3:FM.a * F };
+  const blockH = F * (FM.cap + FM.d);
+  return { band, blockH, F, L2:(FM.cap - FM.x) * F, L3:FM.cap * F };
 }
 
 function layout(opts){
@@ -674,6 +690,12 @@ async function boot(){
   requestAnimationFrame(() => { layout(); sizeCanvas(); });
 }
 boot();
+
+/* Offline support. Guarded on protocol because registering from file:// throws,
+   and teachers do open the file directly when testing. */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
 
 /* exposed for the verification harness */
 window.__app = {

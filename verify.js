@@ -56,9 +56,10 @@ async function fresh(browser, vw, vh) {
       const cs = getComputedStyle(g);
       cvs.font = `${cs.fontWeight} ${parseFloat(cs.fontSize)}px ${cs.fontFamily}`;
       const capAsc = cvs.measureText('H').actualBoundingBoxAscent;
-      const ascAsc = cvs.measureText('bdfhklt').actualBoundingBoxAscent;  // same probe the app sizes to
+      const ascAsc = cvs.measureText('bdfhklt').actualBoundingBoxAscent;
       const xAsc   = cvs.measureText('x').actualBoundingBoxAscent;
       const yDesc  = cvs.measureText('y').actualBoundingBoxDescent;
+      const band   = parseFloat(getComputedStyle(g).lineHeight);
 
       // real baseline of the first line box
       const probe = document.createElement('span');
@@ -67,7 +68,7 @@ async function fresh(browser, vw, vh) {
       const base = probe.getBoundingClientRect().top - g.getBoundingClientRect().top;
       probe.remove();
 
-      return { L1, L2, L3, L4, base, capAsc, ascAsc, xAsc, yDesc, F: parseFloat(cs.fontSize), geo, fm };
+      return { L1, L2, L3, L4, base, capAsc, ascAsc, xAsc, yDesc, band, F: parseFloat(cs.fontSize), geo, fm };
     });
 
     const ascTop  = m.base - m.ascAsc;
@@ -75,11 +76,17 @@ async function fresh(browser, vw, vh) {
     const xTop    = m.base - m.xAsc;
     const descBot = m.base + m.yDesc;
 
-    (near(ascTop, m.L1, 2) ? ok : bad)('F-2 ascender → L1', `ink ${ascTop.toFixed(1)} vs rule ${m.L1.toFixed(1)}`);
-    (near(xTop,   m.L2, 2) ? ok : bad)('F-2 x-height → L2', `ink ${xTop.toFixed(1)} vs rule ${m.L2.toFixed(1)}`);
-    (near(m.base, m.L3, 1) ? ok : bad)('F-2 baseline  → L3', `ink ${m.base.toFixed(1)} vs rule ${m.L3.toFixed(1)}`);
+    (near(capTop,  m.L1, 2) ? ok : bad)('F-2 capital   → L1', `ink ${capTop.toFixed(1)} vs rule ${m.L1.toFixed(1)}`);
+    (near(xTop,    m.L2, 2) ? ok : bad)('F-2 x-height  → L2', `ink ${xTop.toFixed(1)} vs rule ${m.L2.toFixed(1)}`);
+    (near(m.base,  m.L3, 1) ? ok : bad)('F-2 baseline  → L3', `ink ${m.base.toFixed(1)} vs rule ${m.L3.toFixed(1)}`);
     (near(descBot, m.L4, 2) ? ok : bad)('F-2 descender → L4', `ink ${descBot.toFixed(1)} vs rule ${m.L4.toFixed(1)}`);
-    console.log(`    · capital top sits ${(capTop - m.L1).toFixed(1)}px below L1 (font-size ${m.F.toFixed(1)}px)`);
+
+    // Ascenders now rise past L1. They must stay inside the gap and never reach
+    // the bottom rule of the block above (which sits one band higher).
+    const prevL4 = m.L4 - m.band;
+    (ascTop > prevL4 ? ok : bad)('F-2 ascender clears block above',
+      `ascender top ${ascTop.toFixed(1)} vs previous L4 ${prevL4.toFixed(1)} (여유 ${(ascTop - prevL4).toFixed(1)}px)`);
+    console.log(`    · ascender rises ${(m.L1 - ascTop).toFixed(1)}px above L1; gap is ${(m.band - (m.L4 - m.L1)).toFixed(1)}px (font-size ${m.F.toFixed(1)}px)`);
     await ctx.close();
   }
 
@@ -234,6 +241,82 @@ async function fresh(browser, vw, vh) {
       spans: document.querySelectorAll('.bar span[onclick]').length
     }));
     (a.enLang === 'en' && a.toolsHoverFree ? ok : bad)('F-10 a11y basics', JSON.stringify(a));
+    await ctx.close();
+  }
+
+  /* ---------- F-8 PWA ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+
+    // F-8a manifest
+    const man = await page.evaluate(async () => {
+      const link = document.querySelector('link[rel=manifest]');
+      if (!link) return { linked: false };
+      const res = await fetch(link.href);
+      if (!res.ok) return { linked: true, status: res.status };
+      const j = await res.json();
+      const icons = await Promise.all((j.icons || []).map(async i => {
+        const r = await fetch(new URL(i.src, link.href));
+        return { src: i.src, status: r.status };
+      }));
+      return { linked: true, status: 200, name: j.name, start_url: j.start_url,
+               scope: j.scope, display: j.display, icons,
+               maskable: (j.icons || []).some(i => (i.purpose || '').includes('maskable')) };
+    });
+    const manOk = man.linked && man.status === 200 && man.name && man.start_url &&
+                  man.display === 'standalone' && man.maskable &&
+                  man.icons.length >= 3 && man.icons.every(i => i.status === 200);
+    (manOk ? ok : bad)('F-8a manifest + icons',
+      manOk ? `"${man.name}" · ${man.display} · icons ${man.icons.length}/200`
+            : JSON.stringify(man).slice(0, 160));
+
+    // F-8b service worker reaches "activated"
+    const swState = await page.evaluate(async () => {
+      const reg = await navigator.serviceWorker.ready.catch(() => null);
+      if (!reg) return 'no registration';
+      for (let i = 0; i < 60 && !navigator.serviceWorker.controller; i++)
+        await new Promise(r => setTimeout(r, 100));
+      return (reg.active && reg.active.state) +
+             (navigator.serviceWorker.controller ? ' / controlling' : ' / not controlling');
+    });
+    (swState.startsWith('activated') ? ok : bad)('F-8b service worker active', swState);
+
+    // F-8c genuinely offline
+    await ctx.setOffline(true);
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    const offline = await page.evaluate(async () => {
+      for (let i = 0; i < 80 && !(window.__app && window.__app.fm); i++)
+        await new Promise(r => setTimeout(r, 100));
+      const g = document.querySelector('.guide');
+      const fontUrl = new URL('./fonts/Andika-Regular.woff2', location.href).href;
+      let served = 'no';
+      try { const r = await fetch(fontUrl); served = r.ok ? r.headers.get('content-type') : 'HTTP ' + r.status; }
+      catch (e) { served = 'threw'; }
+      return { booted: !!(window.__app && window.__app.fm),
+               guideW: g ? Math.round(g.getBoundingClientRect().width) : 0,
+               andika: document.fonts.check('100px Andika'), served };
+    });
+    (offline.booted && offline.guideW > 100 && offline.andika && offline.served === 'font/woff2' ? ok : bad)(
+      'F-8c works offline',
+      `booted ${offline.booted} · guide ${offline.guideW}px · Andika ${offline.andika} · font served ${offline.served}`);
+    await ctx.setOffline(false);
+    await ctx.close();
+  }
+
+  // F-8d icon files are really the sizes they claim
+  {
+    const { ctx, page } = await fresh(browser, 800, 600);
+    const dims = await page.evaluate(async () => {
+      const want = [['./icons/icon-192.png', 192], ['./icons/icon-512.png', 512], ['./icons/maskable-512.png', 512]];
+      return Promise.all(want.map(([src, n]) => new Promise(res => {
+        const im = new Image();
+        im.onload = () => res({ src, n, w: im.naturalWidth, h: im.naturalHeight });
+        im.onerror = () => res({ src, n, w: 0, h: 0 });
+        im.src = src;
+      })));
+    });
+    const good = dims.every(d => d.w === d.n && d.h === d.n);
+    (good ? ok : bad)('F-8d icon dimensions', dims.map(d => `${d.w}x${d.h}`).join(' · '));
     await ctx.close();
   }
 
