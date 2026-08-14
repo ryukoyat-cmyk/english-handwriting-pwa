@@ -15,12 +15,13 @@
 <style>
   @font-face { font-family:Andika; src:url('./fonts/Andika-Regular.woff2') format('woff2'); font-weight:400; font-display:swap; }
   @font-face { font-family:Andika; src:url('./fonts/Andika-Bold.woff2') format('woff2'); font-weight:700; font-display:swap; }
+  @font-face { font-family:Pretendard; src:url('./fonts/Pretendard-Bold.woff2') format('woff2'); font-weight:700 900; font-display:swap; }
 
   :root{
     --bg:#eef1f5; --paper:#fff; --ink:#1b2027; --muted:#79838f; --hair:#e3e8ee;
     --accent:#eb6536; --accent-soft:#fff1ea;
     --l-outer:#8f9bab; --l-x:#b6c3d2; --l-base:#4a9fd8;
-    --F:64px; --band:120px; --ko:22px; --gpos:0 0; --rowH:220px;
+    --F:64px; --band:120px; --gpos:0 0; --rowH:220px;
     --pen:#1b2027;
   }
   *{ box-sizing:border-box; }
@@ -78,6 +79,23 @@
   body.snap .row{ scroll-snap-align:center; }
   .row + .row{ border-top:1px dashed #eaeef3; }
 
+  .rowline{ display:flex; align-items:stretch; gap:12px; }
+  .rowbody{ flex:1 1 auto; min-width:0; }
+
+  .speakBtn{
+    flex:0 0 auto; align-self:flex-start; margin-top:6px;
+    width:52px; height:52px; border-radius:50%;
+    background:var(--accent); color:#fff; font-size:22px;
+    display:grid; place-items:center; box-shadow:0 4px 12px #eb653645;
+    transition:filter .12s, transform .12s;
+  }
+  .speakBtn:hover{ filter:brightness(1.07); }
+  .speakBtn:active{ transform:scale(.94); }
+  body.mode-draw .speakBtn{ display:none; }
+  .speakBtn.speaking{ animation:speakPulse 1s ease-in-out infinite; }
+  @keyframes speakPulse{ 0%,100%{ box-shadow:0 4px 12px #eb653645; } 50%{ box-shadow:0 4px 22px #eb6536a0; } }
+  @media (prefers-reduced-motion:reduce){ .speakBtn.speaking{ animation:none; outline:3px solid #eb653690; } }
+
   .guide{
     font-family:Andika,Georgia,"Times New Roman",serif; font-weight:400;
     font-size:var(--F); line-height:var(--band);
@@ -98,8 +116,12 @@
   .guide:empty::before{ content:attr(data-ph); color:#c3cbd5; }
 
   .ko{
-    font-size:var(--ko); line-height:1.35; color:#55606d; font-weight:500;
-    outline:0; margin:6px 0 0; padding:2px 4px; border-radius:6px; min-height:1.35em;
+    /* Fixed independent of line-count / sentence-size scale — the teacher's Korean
+       gloss should stay a stable, comfortable size regardless of how the English
+       ruling is resized. Only the viewport width nudges it, so it still fits phones. */
+    font-family:Pretendard,system-ui,sans-serif; font-weight:800;
+    font-size:clamp(26px, 4.4vw, 42px); line-height:1.35; color:#3a4451;
+    outline:0; margin:8px 0 0; padding:2px 4px; border-radius:6px; min-height:1.35em;
     word-break:break-word;
   }
   .ko:empty::before{ content:attr(data-ph); color:#c3cbd5; }
@@ -132,18 +154,32 @@
   #metrics{ position:absolute; left:-9999px; top:0; visibility:hidden; white-space:nowrap; padding:0; margin:0; border:0; }
   .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 
+  /* floating swatch picker for coloring a selected word/phrase in the sentence */
+  .colorpop{
+    position:fixed; z-index:40; transform:translate(-50%,-100%);
+    display:flex; gap:6px; background:#1b2027; padding:6px; border-radius:11px;
+    box-shadow:0 8px 20px #0005;
+  }
+  .colorpop[hidden]{ display:none; }
+  .colorpop button{ width:26px; height:26px; border-radius:50%; padding:0; }
+  .colorpop button span{ display:block; width:100%; height:100%; border-radius:50%; box-shadow:inset 0 0 0 1.5px #ffffff55; }
+  .colorpop button:hover span{ box-shadow:inset 0 0 0 1.5px #fff; }
+
   @media (max-width:640px){
     .title{ width:120px; font-size:16px; }
     .stage{ padding:10px 8px 20px; }
     .sheet{ padding:10px 12px 16px; border-radius:5px; }
     .fab{ right:14px; bottom:14px; height:46px; padding:0 16px; }
+    .speakBtn{ width:40px; height:40px; font-size:18px; margin-top:3px; }
+    .rowline{ gap:8px; }
   }
 
   /* ---------- print ---------- */
   @media print{
     @page{ margin:14mm; }
     html,body{ height:auto; overflow:visible; background:#fff; }
-    .bar,.fab,.toast,.rowtools{ display:none !important; }
+    .bar,.fab,.toast,.rowtools,.speakBtn,.colorpop{ display:none !important; }
+    .rowline{ display:block; }
     .stage{ height:auto; overflow:visible; padding:0; }
     .sheet{ box-shadow:none; border:0; border-radius:0; padding:0; min-height:0; }
     .row{ break-inside:avoid; page-break-inside:avoid; }
@@ -184,6 +220,8 @@
   <div class="grp" id="editTools">
     <span class="lbl">표시 줄 수</span>
     <div class="seg" role="group" id="lineCount" aria-label="한 화면에 보일 문장 수"></div>
+    <span class="lbl">문장 크기</span>
+    <input class="rng" id="scale" type="range" min="50" max="160" step="5" value="100" aria-label="영어 문장 크기 확대·축소" />
     <span class="lbl">예시 농도</span>
     <input class="rng" id="dimAll" type="range" min="0" max="100" step="5" value="100" aria-label="모든 문장 예시 농도" />
   </div>
@@ -207,6 +245,11 @@
 </main>
 
 <button class="fab" id="addRow">＋ 문장 추가</button>
+<div class="colorpop" id="colorpop" hidden role="group" aria-label="선택한 글자 색">
+  <button type="button" data-c="#1b2027" aria-label="기본 색(검정)"><span style="background:#1b2027"></span></button>
+  <button type="button" data-c="#e0322b" aria-label="빨강"><span style="background:#e0322b"></span></button>
+  <button type="button" data-c="#1f6fd0" aria-label="파랑"><span style="background:#1f6fd0"></span></button>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div id="metrics" aria-hidden="true"></div>
 <style id="pageRule">@page{ size:A4 portrait; }</style>
@@ -217,11 +260,64 @@ const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 const clamp = (lo, v, hi) => Math.min(hi, Math.max(lo, v));
 
+/* ================= inline-color sanitizing =================
+   English sentences are stored as HTML so a teacher can color a word or two,
+   but the only thing ever allowed through is <span style="color:ONE-OF-4">.
+   Everything else — scripts, images, links, other tags/attributes — is
+   unwrapped (text kept, wrapper dropped) or stripped outright. Typing never
+   goes through this path (typed characters are always plain text nodes);
+   paste is forced to plain text separately, so HTML only ever enters here
+   via our own color-button clicks or a legacy-data migration, both of which
+   only ever produce these exact whitelisted spans. */
+const INK_COLORS = new Set(['#1b2027', '#e0322b', '#1f6fd0']);
+function normalizeColorValue(v){
+  if(!v) return null;
+  v = String(v).trim().toLowerCase();
+  const m = v.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  if(m) v = '#' + [1,2,3].map(i => (+m[i]).toString(16).padStart(2,'0')).join('');
+  return INK_COLORS.has(v) ? v : null;
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function sanitizeInline(html){
+  const root = document.createElement('div');
+  root.innerHTML = String(html == null ? '' : html);
+  (function clean(node){
+    Array.from(node.childNodes).forEach(child => {
+      if(child.nodeType === Node.TEXT_NODE) return;
+      if(child.nodeType !== Node.ELEMENT_NODE){ child.remove(); return; }
+      clean(child);
+      const tag = child.tagName;
+      let color = null;
+      if(tag === 'SPAN') color = normalizeColorValue(child.style && child.style.color);
+      else if(tag === 'FONT') color = normalizeColorValue(child.getAttribute('color')) || normalizeColorValue(child.style && child.style.color);
+      if(color){
+        const span = document.createElement('span');
+        span.style.color = color;
+        while(child.firstChild) span.appendChild(child.firstChild);
+        child.replaceWith(span);
+      }else{
+        while(child.firstChild) node.insertBefore(child.firstChild, child);
+        child.remove();
+      }
+    });
+  })(root);
+  return root.innerHTML;
+}
+function plainTextOf(html){
+  const root = document.createElement('div');
+  root.innerHTML = sanitizeInline(html);
+  return root.textContent;
+}
+
 /* ================= state ================= */
-const STORE = 'ehw.v2';
+const STORE = 'ehw.v3';
+const LEGACY_STORE = 'ehw.v2';
 const DEFAULTS = () => ({
   title: '오늘의 문장',
   lines: 1,
+  scale: 100,
   rows: [
     { en:'The apple is red.',      ko:'그 사과는 빨간색입니다.',        dim:100 },
     { en:'I like reading books.',  ko:'나는 책 읽는 것을 좋아합니다.',  dim:100 },
@@ -233,15 +329,24 @@ let state = load();
 
 function load(){
   try{
-    const raw = localStorage.getItem(STORE);
+    let raw = localStorage.getItem(STORE);
+    let legacy = false;
+    if(!raw){
+      // v2 stored `en` as plain text; escape it before treating it as HTML so
+      // nothing already saved by a teacher is lost or misparsed by the switch
+      // to rich (colorable) sentences.
+      raw = localStorage.getItem(LEGACY_STORE);
+      legacy = !!raw;
+    }
     if(!raw) return DEFAULTS();
     const p = JSON.parse(raw);
     if(!p || !Array.isArray(p.rows) || !p.rows.length) return DEFAULTS();
     return {
       title: typeof p.title === 'string' ? p.title : '오늘의 문장',
       lines: clamp(1, Number(p.lines) || 1, 5),
+      scale: clamp(50, Number(p.scale) || 100, 160),
       rows: p.rows.map(r => ({
-        en: String(r && r.en || ''),
+        en: legacy ? escapeHtml(r && r.en || '') : sanitizeInline(r && r.en || ''),
         ko: String(r && r.ko || ''),
         dim: clamp(0, Number(r && r.dim), 100) || (r && r.dim === 0 ? 0 : 100)
       }))
@@ -329,7 +434,7 @@ function widthAtSize1(text){
    and the width of the sheet. Pick the largest size that fits the longest
    sentence in at most `maxWrap` ruled lines. */
 function computeGeometry(rowBudget, availW, maxWrap){
-  const W1 = Math.max(0.05, ...state.rows.map(r => widthAtSize1(r.en || 'Type a sentence…')));
+  const W1 = Math.max(0.05, ...state.rows.map(r => widthAtSize1(plainTextOf(r.en) || 'Type a sentence…')));
   const k = K();
   let F = 0;
   for(let n = 1; n <= maxWrap; n++){
@@ -339,6 +444,28 @@ function computeGeometry(rowBudget, availW, maxWrap){
   const band   = F * k;
   const blockH = F * (FM.cap + FM.d);
   return { band, blockH, F, L2:(FM.cap - FM.x) * F, L3:FM.cap * F };
+}
+
+/* Find a line-height ("band") for which the four rule positions — measured
+   against THIS line-height's own real baseline — fit inside a single tile
+   without wrapping past its bottom edge. Naively trusting the first-guess
+   band could place the descender rule's background-position beyond the tile
+   height; repeat-y then wraps it back to the TOP of the same block, drawing
+   a spurious line above the capital rule. Growing the tile to swallow any
+   overflow and re-measuring (half-leading shifts when line-height does)
+   converges in a couple of iterations. */
+function resolveRuling(F, blockH, startBand){
+  let band = startBand;
+  for(let i = 0; i < 6; i++){
+    const bo = baselineInLineBox(F, band);
+    const L3 = FM.cap * F;
+    const O  = ((bo - L3) % band + band) % band;
+    if(O + blockH - 2 <= band - 0.5) return { band, O };
+    band = O + blockH - 2 + 6;
+  }
+  const bo = baselineInLineBox(F, band);
+  const L3 = FM.cap * F;
+  return { band, O:((bo - L3) % band + band) % band };
 }
 
 function layout(opts){
@@ -352,25 +479,30 @@ function layout(opts){
     ? 190
     : Math.max(150, (stage.clientHeight - 40) / state.lines - 14);
 
-  // give the Korean gloss only what it needs; the four rules get everything else.
-  // availW/14 keeps a typical gloss on one line instead of wrapping on phones.
-  const koPx = clamp(20, Math.min(rowH * 0.30 * 0.52, availW / 14), 64);
-  const guideBudget = Math.max(90, rowH - (koPx * 1.35 + 12));
+  // The Korean gloss is a fixed CSS size now (not derived here); reserve a
+  // rough constant for it and let the four rules have everything else.
+  const guideBudget = Math.max(90, rowH - 62);
 
-  const g = computeGeometry(guideBudget, availW, printing ? 3 : (state.lines === 1 ? 3 : 2));
-  GEO = Object.assign(g, { rowH });
+  const fit = computeGeometry(guideBudget, availW, printing ? 3 : (state.lines === 1 ? 3 : 2));
+  const s = clamp(50, Number(state.scale) || 100, 160) / 100;
+  const F = fit.F * s;
+  const g = {
+    F,
+    band: F * K(),
+    blockH: F * (FM.cap + FM.d),
+    L2: (FM.cap - FM.x) * F,
+    L3: FM.cap * F
+  };
 
-  // The baseline rule is painted at (O + L3); park it on the line box's real
-  // baseline so every wrapped line inherits the same alignment.
-  const bo = baselineInLineBox(g.F, g.band);
-  const O  = ((bo - g.L3) % g.band + g.band) % g.band;
-  const p  = n => `0 ${n.toFixed(2)}px`;
+  const { band, O } = resolveRuling(g.F, g.blockH, g.band);
+  g.band = band;
+  GEO = Object.assign(g, { rowH, O });
 
+  const p = n => `0 ${n.toFixed(2)}px`;
   root.style.setProperty('--F', g.F.toFixed(2) + 'px');
   root.style.setProperty('--band', g.band.toFixed(2) + 'px');
   root.style.setProperty('--gpos',
     [ p(O), p(O + g.L2), p(O + g.L3), p(O + g.blockH - 2) ].join(', '));
-  root.style.setProperty('--ko', koPx.toFixed(1) + 'px');
   root.style.setProperty('--rowH', printing ? 'auto' : rowH.toFixed(0) + 'px');
 
   sizeCanvas();
@@ -395,17 +527,23 @@ function makeRow(item, i){
   en.lang = 'en';
   en.spellcheck = false;
   en.setAttribute('role', 'textbox');
-  en.setAttribute('aria-label', `영어 문장 ${i + 1}`);
+  en.setAttribute('aria-label', `영어 문장 ${i + 1}. 일부를 드래그해 선택하면 색을 바꿀 수 있어요.`);
   en.dataset.ph = 'Type a sentence…';
-  setEditable(en);
-  en.textContent = item.en;                     // textContent — never innerHTML
+  setEditableRich(en);
+  en.innerHTML = sanitizeInline(item.en);   // never raw innerHTML — always through the sanitizer
 
   const ko = document.createElement('div');
   ko.className = 'ko';
+  ko.lang = 'ko';
+  ko.spellcheck = false;               // browsers otherwise red-underline Korean as "misspelled"
+  ko.setAttribute('autocorrect', 'off');
+  ko.setAttribute('autocapitalize', 'off');
+  ko.setAttribute('autocomplete', 'off');
+  ko.setAttribute('data-gramm', 'false');   // also mute the Grammarly extension's red marks
   ko.setAttribute('role', 'textbox');
   ko.setAttribute('aria-label', `한글 뜻 ${i + 1}`);
   ko.dataset.ph = '한글 뜻';
-  setEditable(ko);
+  setEditablePlain(ko);
   ko.textContent = item.ko;
 
   const tools = document.createElement('div');
@@ -421,18 +559,29 @@ function makeRow(item, i){
   dim.title = '예시 농도 (0 숨김 · 30 회색 · 100 검정)';
   dim.setAttribute('aria-label', `문장 ${i + 1} 예시 농도`);
 
-  const speak = mkBtn('🔊', `문장 ${i + 1} 읽기`);
-  const del   = mkBtn('✕',  `문장 ${i + 1} 삭제`);
+  const del = mkBtn('✕', `문장 ${i + 1} 삭제`);
+  tools.append(num, dim, del);
 
-  tools.append(num, dim, speak, del);
-  row.append(tools, en, ko);
+  const speak = mkBtn('🔊', `문장 ${i + 1} 읽기 (0.8배속)`);
+  speak.className = 'speakBtn';
+
+  const body = document.createElement('div');
+  body.className = 'rowbody';
+  body.append(en, ko);
+
+  const line = document.createElement('div');
+  line.className = 'rowline';
+  line.append(speak, body);
+
+  row.append(tools, line);
 
   /* --- behaviour --- */
-  en.addEventListener('input', () => { state.rows[i].en = en.textContent; save(); });
+  en.addEventListener('input', () => { state.rows[i].en = sanitizeInline(en.innerHTML); save(); });
+  en.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });   // sentences don't wrap via manual newlines
   ko.addEventListener('input', () => { state.rows[i].ko = ko.textContent; save(); });
   en.addEventListener('focus', () => applyDim(row, i));
   en.addEventListener('blur',  () => applyDim(row, i));
-  [en, ko].forEach(el => el.addEventListener('paste', onPastePlain));
+  [en, ko].forEach(el => el.addEventListener('paste', onPastePlain));   // colors only ever come from our own swatch buttons, never pasted HTML
 
   dim.addEventListener('input', () => {
     const v = Number(dim.value);
@@ -444,7 +593,7 @@ function makeRow(item, i){
     applyDim(row, i); save();
   });
 
-  speak.onclick = () => speakText(state.rows[i].en);
+  speak.onclick = () => speakText(plainTextOf(state.rows[i].en), speak);
   del.onclick = () => {
     if(state.rows.length <= 1){ notify('마지막 문장은 삭제할 수 없어요.'); return; }
     state.rows.splice(i, 1); render(); save(); notify('문장을 삭제했어요.');
@@ -461,7 +610,12 @@ function mkBtn(glyph, label){
   return b;
 }
 
-function setEditable(el){
+/* .guide allows inline <span style="color:…"> from the color-swatch popup.
+   .ko stays plain — no formatting needed for the Korean gloss. */
+function setEditableRich(el){
+  el.setAttribute('contenteditable', 'true');
+}
+function setEditablePlain(el){
   el.setAttribute('contenteditable', 'plaintext-only');
   // Firefox < 136 rejects plaintext-only and reports "inherit"
   if(el.contentEditable !== 'plaintext-only') el.setAttribute('contenteditable', 'true');
@@ -480,14 +634,20 @@ function render(){
 }
 
 /* ================= speech (secondary feature) ================= */
-function speakText(text){
+const SPEECH_RATE = 0.8;
+function speakText(text, btn){
   if(!text.trim()) return notify('읽을 문장을 먼저 입력하세요.');
   if(!('speechSynthesis' in window)) return notify('이 브라우저는 음성을 지원하지 않아요.');
   speechSynthesis.cancel();
+  $$('.speakBtn.speaking').forEach(b => b.classList.remove('speaking'));   // only one plays at a time
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-US'; u.rate = 0.85;
+  u.lang = 'en-US'; u.rate = SPEECH_RATE;
+  if(btn){
+    btn.classList.add('speaking');
+    u.onend = u.onerror = () => btn.classList.remove('speaking');
+  }
   speechSynthesis.speak(u);
-  notify('문장을 읽고 있어요');
+  window.__app && (window.__app.lastRate = SPEECH_RATE);
 }
 
 /* ================= ink ================= */
@@ -600,11 +760,12 @@ function setMode(m){
   $('#mDraw').setAttribute('aria-pressed', String(m === 'draw'));
   $('#drawTools').hidden = (m !== 'draw');
   $('#editTools').hidden = (m === 'draw');
-  $$('.guide, .ko').forEach(el => {
-    if(m === 'draw') el.setAttribute('contenteditable', 'false');
-    else setEditable(el);
-  });
-  if(m === 'draw' && document.activeElement) document.activeElement.blur();
+  $$('.guide').forEach(el => el.setAttribute('contenteditable', m === 'draw' ? 'false' : 'true'));
+  $$('.ko').forEach(el => { if(m === 'draw') el.setAttribute('contenteditable', 'false'); else setEditablePlain(el); });
+  if(m === 'draw'){
+    if(document.activeElement) document.activeElement.blur();
+    $('#colorpop').hidden = true;
+  }
 }
 $('#mEdit').onclick = () => setMode('edit');
 $('#mDraw').onclick = () => setMode('draw');
@@ -637,6 +798,61 @@ for(let n = 1; n <= 5; n++){
   };
   lc.appendChild(b);
 }
+
+$('#scale').value = state.scale;
+$('#scale').oninput = e => {
+  state.scale = Number(e.target.value);
+  layout(); save();
+};
+
+/* ================= inline color popup ================= */
+const colorpop = $('#colorpop');
+let colorTarget = null;
+
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if(!sel || sel.rangeCount === 0 || sel.isCollapsed || document.body.classList.contains('mode-draw')){
+    colorpop.hidden = true; colorTarget = null; return;
+  }
+  const anchorEl = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+  const guideEl = anchorEl && anchorEl.closest && anchorEl.closest('.guide');
+  if(!guideEl){ colorpop.hidden = true; colorTarget = null; return; }
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  if(!rect || (rect.width === 0 && rect.height === 0)){ colorpop.hidden = true; return; }
+  colorTarget = guideEl;
+  colorpop.style.left = clamp(40, rect.left + rect.width / 2, innerWidth - 40) + 'px';
+  colorpop.style.top  = Math.max(44, rect.top - 8) + 'px';
+  colorpop.hidden = false;
+});
+
+/* execCommand('foreColor') is deprecated and already unreliable in current
+   Chromium (silently returns false), so the selected range is recolored by
+   hand: lift it out, wrap it in a plain <span style="color:…">, put it back. */
+function colorSelection(color){
+  const sel = window.getSelection();
+  if(!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+  const range = sel.getRangeAt(0);
+  const span = document.createElement('span');
+  span.style.color = color;
+  span.appendChild(range.extractContents());
+  range.insertNode(span);
+  sel.removeAllRanges();
+  const after = document.createRange();
+  after.selectNodeContents(span);
+  sel.addRange(after);
+  return true;
+}
+
+$$('button', colorpop).forEach(btn => {
+  btn.addEventListener('mousedown', e => e.preventDefault());   // keep the text selection alive through the click
+  btn.addEventListener('click', () => {
+    if(!colorTarget) return;
+    colorSelection(btn.dataset.c);
+    const i = $$('.guide').indexOf(colorTarget);
+    if(i >= 0){ state.rows[i].en = sanitizeInline(colorTarget.innerHTML); save(); }
+    colorpop.hidden = true;
+  });
+});
 
 $('#dimAll').oninput = e => {
   const v = Number(e.target.value);
@@ -702,7 +918,9 @@ window.__app = {
   get state(){ return state; },
   get geo(){ return GEO; },
   get fm(){ return FM; },
-  get strokes(){ return strokes; }
+  get strokes(){ return strokes; },
+  lastRate: null,
+  sanitizeInline, plainTextOf
 };
 </script>
 </body>
