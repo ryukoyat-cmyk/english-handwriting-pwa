@@ -3,7 +3,7 @@
    so everything is precached and served from cache first. Freshness is a
    second-order concern: updates land on the next visit. */
 
-const CACHE = 'ehw-v2';
+const CACHE = 'ehw-v3';
 
 const PRECACHE = [
   './',
@@ -49,12 +49,22 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(req, { ignoreSearch: true });
-
     const fromNetwork = fetch(req).then(res => {
       if (res && res.ok) cache.put(req, res.clone());
       return res;
     }).catch(() => null);
+
+    // The application shell must update immediately after a deployment.
+    // Assets can still use the fast offline cache below, but never let an old
+    // index.html hide a new version of the learning board.
+    if (req.mode === 'navigate') {
+      const fresh = await fromNetwork;
+      if (fresh) return fresh;
+      const shell = await cache.match('./index.html');
+      if (shell) return shell;
+    }
+
+    const cached = await cache.match(req, { ignoreSearch: true });
 
     // stale-while-revalidate: answer instantly, refresh in the background
     if (cached) { event.waitUntil(fromNetwork); return cached; }
@@ -62,10 +72,6 @@ self.addEventListener('fetch', event => {
     const res = await fromNetwork;
     if (res) return res;
 
-    if (req.mode === 'navigate') {
-      const shell = await cache.match('./index.html');
-      if (shell) return shell;
-    }
     return new Response('오프라인이고 이 파일은 저장되어 있지 않습니다.', {
       status: 504, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
     });
