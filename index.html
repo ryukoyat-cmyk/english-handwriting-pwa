@@ -85,20 +85,19 @@
   .rowbody{ flex:1 1 auto; min-width:0; }
 
   .speakBtns{
-    flex:0 0 52px; align-self:flex-start; margin-top:6px;
+    flex:0 0 64px; align-self:flex-start; margin-top:6px;
     display:flex; flex-direction:column; gap:6px;
   }
 
   .speakBtn{
-    width:52px; height:52px; border-radius:50%;
-    background:var(--accent); color:#fff; font-size:12px; font-weight:900;
-    letter-spacing:.02em;
+    width:64px; height:36px; border-radius:10px;
+    background:var(--accent); color:#fff; font-size:13px; font-weight:900;
+    letter-spacing:.04em;
     display:grid; place-items:center; box-shadow:0 4px 12px #eb653645;
     transition:filter .12s, transform .12s;
   }
   .speakBtn:hover{ filter:brightness(1.07); }
   .speakBtn:active{ transform:scale(.94); }
-  body.mode-draw .speakBtns{ display:none; }
   .speakBtn.speaking{ animation:speakPulse 1s ease-in-out infinite; }
   @keyframes speakPulse{ 0%,100%{ box-shadow:0 4px 12px #eb653645; } 50%{ box-shadow:0 4px 22px #eb6536a0; } }
   @media (prefers-reduced-motion:reduce){ .speakBtn.speaking{ animation:none; outline:3px solid #eb653690; } }
@@ -201,8 +200,8 @@
     .stage{ padding:10px 8px 20px; }
     .sheet{ padding:10px 12px 16px; border-radius:5px; }
     .fab{ right:14px; bottom:14px; height:46px; padding:0 16px; }
-    .speakBtns{ flex-basis:40px; margin-top:3px; gap:5px; }
-    .speakBtn{ width:40px; height:40px; font-size:10px; }
+    .speakBtns{ flex-basis:52px; margin-top:3px; gap:5px; }
+    .speakBtn{ width:52px; height:32px; font-size:10px; }
     .rowline{ gap:8px; }
   }
 
