@@ -74,7 +74,7 @@
   .stage{ height:calc(100% - 60px); overflow:auto; overscroll-behavior:contain; padding:18px 20px 26px; scroll-snap-type:y proximity; }
   .sheet{ position:relative; background:var(--paper); border:1px solid var(--hair); border-radius:8px; box-shadow:0 10px 30px #1b20270d; padding:14px 26px 20px; min-height:100%; }
 
-  .row{ position:relative; display:flex; flex-direction:column; justify-content:center; padding:16px 0; }
+  .row{ position:relative; display:flex; flex-direction:column; justify-content:center; padding:16px 0; min-height:var(--page-row-height, auto); }
   /* 표시 줄 수 groups rows into scroll-snap pages of N: only the first row of
      each group is a snap point, so scrolling settles on page boundaries
      instead of every single sentence once N > 1. */
@@ -152,15 +152,28 @@
 
   /* ---------- ink ---------- */
   #ink{ position:absolute; inset:0; z-index:4; touch-action:none; pointer-events:none; }
-  body.mode-draw #ink{ pointer-events:auto; cursor:crosshair; }
-  body.mode-draw .guide, body.mode-draw .ko{ -webkit-user-modify:read-only; user-select:none; }
+  body.mode-draw-b #ink{ pointer-events:auto; cursor:crosshair; }
+  body.mode-draw-a #ink{ pointer-events:none; }
+  body.mode-draw-a .ruleClip{ touch-action:none; cursor:crosshair; }
+  body.mode-draw .guide, body.mode-draw-b .ko{ -webkit-user-modify:read-only; user-select:none; }
   body.mode-draw .stage{ overscroll-behavior:none; }
+  body.mode-draw-a .guide{ color:transparent !important; caret-color:transparent; background-image:linear-gradient(var(--l-outer) 0 2px, transparent 2px),linear-gradient(var(--l-x) 0 1.5px, transparent 1.5px),linear-gradient(var(--l-base) 0 2px, transparent 2px),linear-gradient(var(--l-outer) 0 2px, transparent 2px) !important; background-repeat:repeat-y; background-size:100% var(--band); background-position:var(--gpos); }
+  body.mode-draw-a .guide:empty::before{ content:none; }
+  body.mode-draw-b #rows{ display:none; }
+  body.mode-draw-b #rows:empty::before{ display:none; }
 
   .fab{ position:fixed; right:22px; bottom:20px; height:52px; padding:0 20px; border-radius:26px; background:var(--ink); color:#fff; font-size:15px; font-weight:700; box-shadow:0 8px 22px #1b202740; display:flex; align-items:center; gap:8px; z-index:20; }
-  body.mode-draw .fab{ display:none; }
+  body.mode-draw-b .fab{ display:none; }
+  .free-actions{ display:none; position:fixed; right:22px; bottom:20px; z-index:21; gap:8px; }
+  body.mode-draw-b .free-actions{ display:flex; }
+  .free-actions button{ height:52px; padding:0 18px; border-radius:26px; background:var(--ink); color:#fff; font-weight:750; box-shadow:0 8px 22px #1b202740; }
+  .free-actions button:first-child{ background:#596473; }
+  #rows:empty::before{ content:'오른쪽 아래의 + 문장 추가 버튼으로 시작하세요.'; min-height:calc(100vh - 190px); display:grid; place-items:center; color:#a3acb7; font-size:15px; font-weight:650; }
 
   .toast{ position:fixed; left:50%; bottom:24px; transform:translate(-50%,16px); opacity:0; pointer-events:none; background:#1b2027; color:#fff; padding:10px 16px; border-radius:999px; font-size:13px; transition:.22s; z-index:30; }
   .toast.show{ opacity:1; transform:translate(-50%,0); }
+
+  .copyright{ position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:25; padding:4px 10px; text-align:center; color:#8b95a2; font-size:12px; font-weight:650; letter-spacing:.02em; pointer-events:none; white-space:nowrap; }
 
   #metrics{ position:absolute; left:-9999px; top:0; visibility:hidden; white-space:nowrap; padding:0; margin:0; border:0; }
   .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
@@ -197,18 +210,20 @@
     .row + .row{ border-top:0; }
     body:not(.print-ink) #ink{ display:none; }
     .guide:empty::before, .ko:empty::before{ content:none; }
+    .copyright{ position:static; transform:none; padding-top:8mm; }
   }
 </style>
 </head>
 <body class="mode-edit">
 
 <header class="bar">
-  <input class="title" id="title" aria-label="학습지 제목" placeholder="제목" />
+  <input class="title" id="title" aria-label="학습지 제목" placeholder="JAEYUN MADE" />
 
   <div class="grp">
     <div class="seg" role="group" aria-label="모드">
       <button id="mEdit"  aria-pressed="true">✏️ 편집</button>
-      <button id="mDraw"  aria-pressed="false">🖊️ 필기</button>
+      <button id="mDrawA" aria-pressed="false">🖊️ 필기(A)</button>
+      <button id="mDrawB" aria-pressed="false">🖍️ 필기(B)</button>
     </div>
   </div>
 
@@ -251,11 +266,16 @@
 <main class="stage" id="stage">
   <div class="sheet" id="sheet">
     <div id="rows"></div>
+    <footer class="copyright">© 2026 박재윤. All rights reserved.</footer>
     <canvas id="ink" aria-label="필기 판서 영역"></canvas>
   </div>
 </main>
 
 <button class="fab" id="addRow">＋ 문장 추가</button>
+<div class="free-actions" aria-label="화이트보드 필기 도구">
+  <button id="freeUndo">↩ 되돌리기</button>
+  <button id="freeClear">전체 지우기</button>
+</div>
 <div class="colorpop" id="colorpop" hidden role="group" aria-label="선택한 글자 색">
   <button type="button" data-c="#1b2027" aria-label="기본 색(검정)"><span style="background:#1b2027"></span></button>
   <button type="button" data-c="#e0322b" aria-label="빨강"><span style="background:#e0322b"></span></button>
@@ -323,26 +343,23 @@ function plainTextOf(html){
 }
 
 /* ================= state ================= */
-const STORE = 'ehw.v3';
-const LEGACY_STORE = 'ehw.v2';
+const STORE = 'ehw.v5';
+const LEGACY_STORE = null;
 const DEFAULTS = () => ({
-  title: '오늘의 문장',
+  title: 'JAEYUN MADE',
   lines: 1,
   scale: 100,
-  rows: [
-    { en:'The apple is red.',      ko:'그 사과는 빨간색입니다.',        dim:100 },
-    { en:'I like reading books.',  ko:'나는 책 읽는 것을 좋아합니다.',  dim:100 },
-    { en:'This is my classroom.',  ko:'여기는 나의 교실입니다.',        dim:100 }
-  ]
+  rows: []
 });
 
 let state = load();
+if(!state.title || state.title === '오늘의 문장') state.title = 'JAEYUN MADE';
 
 function load(){
   try{
     let raw = localStorage.getItem(STORE);
     let legacy = false;
-    if(!raw){
+    if(!raw && LEGACY_STORE){
       // v2 stored `en` as plain text; escape it before treating it as HTML so
       // nothing already saved by a teacher is lost or misparsed by the switch
       // to rich (colorable) sentences.
@@ -351,10 +368,10 @@ function load(){
     }
     if(!raw) return DEFAULTS();
     const p = JSON.parse(raw);
-    if(!p || !Array.isArray(p.rows) || !p.rows.length) return DEFAULTS();
+    if(!p || !Array.isArray(p.rows)) return DEFAULTS();
     return {
       title: typeof p.title === 'string' ? p.title : '오늘의 문장',
-      lines: clamp(1, Number(p.lines) || 1, 5),
+      lines: clamp(1, Number(p.lines) || 1, 4),
       scale: clamp(50, Number(p.scale) || 100, 160),
       rows: p.rows.map(r => ({
         en: legacy ? escapeHtml(r && r.en || '') : sanitizeInline(r && r.en || ''),
@@ -441,7 +458,7 @@ function widthAtSize1(text){
 function fitFont(availW, printing){
   const W1 = Math.max(0.05, ...state.rows.map(r => widthAtSize1(plainTextOf(r.en) || 'Type a sentence…')));
   const ceiling = printing ? 110 : 240;
-  const floor   = printing ? 40 : 70;
+  const floor   = printing ? 32 : Math.max(26, 70 - (state.lines - 1) * 11);
   // Prefer one line at a legible size. Only a genuinely long sentence should
   // ever hit the floor — and when it does, let it wrap to two lines instead
   // of shrinking every row (including short ones, since F is shared) down to
@@ -482,25 +499,25 @@ function layout(opts){
   const probe = $('.guide');
   const availW = (probe ? probe.clientWidth : $('#sheet').clientWidth - 52) * 0.97;
 
-  const F = fitFont(availW, printing);
+  const stageH = $('#stage').clientHeight;
+  const perRow = printing ? Infinity : Math.max(108, (stageH - 38) / state.lines);
+  const ko = $('.ko');
+  const koH = ko ? Math.max(38, ko.getBoundingClientRect().height + 10) : 58;
+  const chromeH = koH + 38;
+  const metricRatio = FM.cap + FM.d + 0.14;
+  const heightFit = printing ? Infinity : Math.max(24, (perRow - chromeH) / metricRatio);
+  const F = Math.min(fitFont(availW, printing), heightFit);
+
+  // Preserve the established four-line teaching geometry: the capital line,
+  // dashed middle, blue baseline and descender line form three equal zones.
+  // The font is fitted into this ruling; the ruling is never derived from a
+  // single glyph's x-height or descender shape.
   const cap = FM.cap * F, ascender = FM.ascender * F;
-  // Andika's own x-height sits unusually high (≈70% of cap-height), so pinning
-  // L2 to the font's literal x-height ink packed the capital-to-baseline zone
-  // and left the baseline-to-descender zone comparatively cramped — the three
-  // gaps looked visibly uneven. L1 (cap) and L3 (baseline) stay anchored to
-  // real ink, since that's what "writing sits on the line" depends on; L2 and
-  // L4 become an even three-way split instead of literal x-height/descender
-  // marks, matching how printed ruled notebook paper is laid out (evenly,
-  // independent of any one typeface's metrics) — the true descender ink
-  // (d) is comfortably inside this wider bottom zone either way.
-  const half = cap / 2, L2 = half, L3 = cap, blockH = cap + half;
-
+  // Move the dashed second rule slightly upward so the x-height-to-baseline
+  // zone (rules 2→3) has a little more breathing room for the practice face.
+  const half = cap / 2, L2 = cap * 0.40, L3 = cap, blockH = cap + half;
   const nominalGap = Math.max(0.12 * blockH, (ascender - cap) + 0.05 * F);
-  const { band: TILE, O: O_natural } = resolveRuling(F, blockH, blockH + nominalGap);
-
-  // The window a teacher actually sees: a small, constant headroom (just
-  // enough for the ascender overshoot) plus the block itself — the same for
-  // every row, since it depends only on the shared F, not on any row's text.
+  const { band:TILE, O:O_natural } = resolveRuling(F, blockH, blockH + nominalGap);
   const O_target = Math.max((ascender - cap) * 1.3, 0.10 * blockH);
   const shift = Math.max(0, O_natural - O_target);
 
@@ -510,6 +527,7 @@ function layout(opts){
   root.style.setProperty('--gpos',
     [ p(O_natural), p(O_natural + L2), p(O_natural + L3), p(O_natural + blockH - 2) ].join(', '));
   root.style.setProperty('--shift', (-shift).toFixed(2) + 'px');
+  root.style.setProperty('--page-row-height', printing ? 'auto' : perRow.toFixed(2) + 'px');
 
   GEO = { F, band:TILE, blockH, L2, L3, O:O_natural, O_target, shift, winH:O_target + blockH + 4 };
 
@@ -568,7 +586,7 @@ function makeRow(item, i){
   ko.setAttribute('data-gramm', 'false');   // also mute the Grammarly extension's red marks
   ko.setAttribute('role', 'textbox');
   ko.setAttribute('aria-label', `한글 뜻 ${i + 1}`);
-  ko.dataset.ph = '한글 뜻';
+  ko.dataset.ph = '한글 뜻을 입력하세요';
   setEditablePlain(ko);
   ko.textContent = item.ko;
 
@@ -612,6 +630,13 @@ function makeRow(item, i){
   en.addEventListener('focus', () => applyDim(row, i));
   en.addEventListener('blur',  () => applyDim(row, i));
   [en, ko].forEach(el => el.addEventListener('paste', onPastePlain));   // colors only ever come from our own swatch buttons, never pasted HTML
+  ruleClip.addEventListener('pointerdown', e => {
+    if(!document.body.classList.contains('mode-draw-a')) return;
+    beginStroke(e);
+  });
+  ruleClip.addEventListener('pointermove', moveStroke);
+  ruleClip.addEventListener('pointerup', endStroke);
+  ruleClip.addEventListener('pointercancel', endStroke);
 
   dim.addEventListener('input', () => {
     const v = Number(dim.value);
@@ -625,7 +650,6 @@ function makeRow(item, i){
 
   speak.onclick = () => speakText(plainTextOf(state.rows[i].en), speak);
   del.onclick = () => {
-    if(state.rows.length <= 1){ notify('마지막 문장은 삭제할 수 없어요.'); return; }
     state.rows.splice(i, 1); render(); save(); notify('문장을 삭제했어요.');
   };
 
@@ -662,6 +686,7 @@ function render(){
   state.rows.forEach((r, i) => rowsEl.appendChild(makeRow(r, i)));
   applySnapGrouping();
   layout();
+  if(typeof currentMode !== 'undefined') setMode(currentMode);
 }
 
 /* 표시 줄 수 no longer resizes anything (a fixed English size looks better —
@@ -669,7 +694,7 @@ function render(){
    job is purely how scrolling pages through the sheet: N=1 snaps to every
    sentence, N=3 snaps every three, etc. */
 function applySnapGrouping(){
-  const n = clamp(1, Number(state.lines) || 1, 5);
+  const n = clamp(1, Number(state.lines) || 1, 4);
   $$('.row').forEach((row, i) => row.classList.toggle('snapPoint', i % n === 0));
 }
 
@@ -693,9 +718,14 @@ function speakText(text, btn){
 /* ================= ink ================= */
 const canvas = $('#ink');
 const cx = canvas.getContext('2d');
-let strokes = [];            // { color, w, pts:[{x,y}] }  — document coordinates
-let history = [];            // snapshots for undo
+const inkStores = { drawA:[], drawB:[] };
+const inkHistories = { drawA:[], drawB:[] };
+let currentInkMode = 'drawA';
+let strokes = inkStores.drawA;       // active mode's document-coordinate strokes
+let history = inkHistories.drawA;    // active mode's undo snapshots
 let cur = null;
+let inkCaptureTarget = null;
+let activeInkBounds = null;
 let tool = 'pen', penColor = '#1b2027', penW = 9;
 
 function sizeCanvas(){
@@ -748,67 +778,99 @@ function eraseAt(p){
   const R = 22;
   const before = strokes.length;
   strokes = strokes.filter(s => !s.pts.some(q => Math.hypot(q.x - p.x, q.y - p.y) < R + s.w / 2));
+  inkStores[currentInkMode] = strokes;
   if(strokes.length !== before) redraw();
   return strokes.length !== before;
 }
 
-canvas.addEventListener('pointerdown', e => {
-  if(!document.body.classList.contains('mode-draw')) return;
+function beginStroke(e){
   e.preventDefault();
-  canvas.setPointerCapture(e.pointerId);
+  inkCaptureTarget = e.currentTarget;
+  inkCaptureTarget.setPointerCapture?.(e.pointerId);
+  if(document.body.classList.contains('mode-draw-a')){
+    const a=inkCaptureTarget.getBoundingClientRect(), c=canvas.getBoundingClientRect();
+    activeInkBounds={ left:a.left-c.left, top:a.top-c.top, right:a.right-c.left, bottom:a.bottom-c.top };
+  }else activeInkBounds=null;
   const p = ptOf(e);
   if(tool === 'erase'){ pushHistory(); eraseAt(p); cur = { erasing:true }; return; }
   pushHistory();
   cur = { color:penColor, w:penW, pts:[p] };
   strokes.push(cur);
   drawStroke(cur);
-});
+}
 
-canvas.addEventListener('pointermove', e => {
+function moveStroke(e){
   if(!cur) return;
   e.preventDefault();
-  if(cur.erasing){ eraseAt(ptOf(e)); return; }
+  const inside = p => !activeInkBounds || (p.x>=activeInkBounds.left && p.x<=activeInkBounds.right && p.y>=activeInkBounds.top && p.y<=activeInkBounds.bottom);
+  if(cur.erasing){ const p=ptOf(e); if(inside(p)) eraseAt(p); return; }
   const evts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-  for(const ev of evts) cur.pts.push(ptOf(ev));
+  for(const ev of evts){ const p=ptOf(ev); if(inside(p)) cur.pts.push(p); }
   redraw();
-});
+}
 
 function endStroke(e){
   if(!cur) return;
-  if(e && canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  if(e && inkCaptureTarget?.hasPointerCapture?.(e.pointerId)) inkCaptureTarget.releasePointerCapture(e.pointerId);
   cur = null;
+  inkCaptureTarget = null;
+  activeInkBounds = null;
 }
+canvas.addEventListener('pointerdown', e => {
+  if(!document.body.classList.contains('mode-draw-b')) return;
+  beginStroke(e);
+});
+canvas.addEventListener('pointermove', moveStroke);
 canvas.addEventListener('pointerup', endStroke);
 canvas.addEventListener('pointercancel', endStroke);   // note: NOT pointerleave
 
 $('#undo').onclick = () => {
   if(!history.length) return;
   strokes = history.pop();
+  inkStores[currentInkMode] = strokes;
   $('#undo').disabled = !history.length;
   redraw();
 };
 $('#clearInk').onclick = () => {
   if(!strokes.length) return notify('지울 필기가 없어요.');
-  pushHistory(); strokes = []; redraw(); notify('필기를 모두 지웠어요.');
+  pushHistory(); strokes = []; inkStores[currentInkMode] = strokes; redraw(); notify('필기를 모두 지웠어요.');
 };
+$('#freeUndo').onclick = () => $('#undo').click();
+$('#freeClear').onclick = () => $('#clearInk').click();
 
 /* ================= toolbar wiring ================= */
+let currentMode = 'edit';
 function setMode(m){
-  document.body.classList.toggle('mode-draw', m === 'draw');
+  currentMode = m;
+  const drawing = m === 'drawA' || m === 'drawB';
+  if(drawing){
+    currentInkMode = m;
+    strokes = inkStores[m];
+    history = inkHistories[m];
+    $('#undo').disabled = !history.length;
+  }
+  document.body.classList.toggle('mode-draw', drawing);
+  document.body.classList.toggle('mode-draw-a', m === 'drawA');
+  document.body.classList.toggle('mode-draw-b', m === 'drawB');
   document.body.classList.toggle('mode-edit', m === 'edit');
   $('#mEdit').setAttribute('aria-pressed', String(m === 'edit'));
-  $('#mDraw').setAttribute('aria-pressed', String(m === 'draw'));
-  $('#drawTools').hidden = (m !== 'draw');
-  $('#editTools').hidden = (m === 'draw');
-  $$('.guide').forEach(el => el.setAttribute('contenteditable', m === 'draw' ? 'false' : 'true'));
-  $$('.ko').forEach(el => { if(m === 'draw') el.setAttribute('contenteditable', 'false'); else setEditablePlain(el); });
-  if(m === 'draw'){
+  $('#mDrawA').setAttribute('aria-pressed', String(m === 'drawA'));
+  $('#mDrawB').setAttribute('aria-pressed', String(m === 'drawB'));
+  $('#drawTools').hidden = !drawing;
+  $('#editTools').hidden = drawing;
+  $$('.guide').forEach(el => el.setAttribute('contenteditable', drawing ? 'false' : 'true'));
+  $$('.ko').forEach(el => { if(m === 'drawB') el.setAttribute('contenteditable', 'false'); else setEditablePlain(el); });
+  if(drawing){
     if(document.activeElement) document.activeElement.blur();
     $('#colorpop').hidden = true;
   }
+  layout();
+  sizeCanvas();
+  redraw();
 }
 $('#mEdit').onclick = () => setMode('edit');
-$('#mDraw').onclick = () => setMode('draw');
+$('#mDrawA').onclick = () => setMode('drawA');
+$('#mDrawB').onclick = () => setMode('drawB');
 
 $('#tPen').onclick   = () => { tool = 'pen';   $('#tPen').setAttribute('aria-pressed','true');  $('#tErase').setAttribute('aria-pressed','false'); };
 $('#tErase').onclick = () => { tool = 'erase'; $('#tPen').setAttribute('aria-pressed','false'); $('#tErase').setAttribute('aria-pressed','true');  };
@@ -823,17 +885,19 @@ $$('.nib').forEach(b => b.onclick = () => {
   $$('.nib').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
 });
 
-/* 표시 줄 수 — groups rows into scroll-snap pages of N (see applySnapGrouping) */
+/* 표시 줄 수 — fits N complete rows in the visible stage and keeps page snaps */
 const lc = $('#lineCount');
-for(let n = 1; n <= 5; n++){
+for(let n = 1; n <= 4; n++){
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = String(n);
-  b.setAttribute('aria-label', `${n}문장씩 스크롤 스냅`);
+  b.setAttribute('aria-label', `화면에 ${n}문장 표시`);
   b.setAttribute('aria-pressed', String(n === state.lines));
   b.onclick = () => {
     state.lines = n;
     $$('button', lc).forEach((o, i) => o.setAttribute('aria-pressed', String(i + 1 === n)));
     applySnapGrouping();
+    layout();
+    $('#stage').scrollTo({ top:0, behavior:'smooth' });
     save();
   };
   lc.appendChild(b);
@@ -906,7 +970,10 @@ $('#addRow').onclick = () => {
   state.rows.push({ en:'', ko:'', dim:100 });
   render(); save();
   const last = $$('.guide').pop();
-  if(last){ last.focus(); last.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  if(last){
+    if(document.body.classList.contains('mode-edit')) last.focus();
+    last.closest('.row').scrollIntoView({ behavior:'smooth', block:'center' });
+  }
 };
 
 $('#title').value = state.title;
