@@ -91,13 +91,14 @@
 
   .speakBtn{
     width:52px; height:52px; border-radius:50%;
-    background:var(--accent); color:#fff; font-size:22px;
+    background:var(--accent); color:#fff; font-size:12px; font-weight:900;
+    letter-spacing:.02em;
     display:grid; place-items:center; box-shadow:0 4px 12px #eb653645;
     transition:filter .12s, transform .12s;
   }
   .speakBtn:hover{ filter:brightness(1.07); }
   .speakBtn:active{ transform:scale(.94); }
-  body.mode-draw .speakBtn{ display:none; }
+  body.mode-draw .speakBtns{ display:none; }
   .speakBtn.speaking{ animation:speakPulse 1s ease-in-out infinite; }
   @keyframes speakPulse{ 0%,100%{ box-shadow:0 4px 12px #eb653645; } 50%{ box-shadow:0 4px 22px #eb6536a0; } }
   @media (prefers-reduced-motion:reduce){ .speakBtn.speaking{ animation:none; outline:3px solid #eb653690; } }
@@ -201,7 +202,7 @@
     .sheet{ padding:10px 12px 16px; border-radius:5px; }
     .fab{ right:14px; bottom:14px; height:46px; padding:0 16px; }
     .speakBtns{ flex-basis:40px; margin-top:3px; gap:5px; }
-    .speakBtn{ width:40px; height:40px; font-size:17px; }
+    .speakBtn{ width:40px; height:40px; font-size:10px; }
     .rowline{ gap:8px; }
   }
 
@@ -209,7 +210,7 @@
   @media print{
     @page{ margin:14mm; }
     html,body{ height:auto; overflow:visible; background:#fff; }
-    .bar,.fab,.toast,.rowtools,.speakBtn,.colorpop{ display:none !important; }
+    .bar,.fab,.toast,.rowtools,.speakBtns,.colorpop{ display:none !important; }
     .rowline{ display:block; }
     .stage{ height:auto; overflow:visible; padding:0; }
     .sheet{ box-shadow:none; border:0; border-radius:0; padding:0; min-height:0; }
@@ -350,13 +351,14 @@ function plainTextOf(html){
 }
 
 /* ================= state ================= */
-const STORE = 'ehw.v5';
-const LEGACY_STORE = null;
+const STORE = 'ehw.v6';
+const LEGACY_STORE = 'ehw.v5';
 const DEFAULTS = () => ({
   title: 'JAEYUN MADE',
   lines: 1,
   scale: 100,
-  rows: []
+  editRows: [],
+  drawARows: []
 });
 
 let state = load();
@@ -375,16 +377,22 @@ function load(){
     }
     if(!raw) return DEFAULTS();
     const p = JSON.parse(raw);
-    if(!p || !Array.isArray(p.rows)) return DEFAULTS();
+    if(!p) return DEFAULTS();
+    const normalizeRows = rows => Array.isArray(rows) ? rows.map(r => ({
+      en: legacy ? escapeHtml(r && r.en || '') : sanitizeInline(r && r.en || ''),
+      ko: String(r && r.ko || ''),
+      dim: clamp(0, Number(r && r.dim), 100) || (r && r.dim === 0 ? 0 : 100)
+    })) : [];
+    // Earlier versions had one shared sentence list. Keep it in 편집 only;
+    // 필기(A) deliberately begins empty and remains an independent workspace.
+    const editRows = normalizeRows(Array.isArray(p.editRows) ? p.editRows : p.rows);
+    const drawARows = normalizeRows(p.drawARows);
     return {
       title: typeof p.title === 'string' ? p.title : '오늘의 문장',
       lines: clamp(1, Number(p.lines) || 1, 3),
       scale: clamp(50, Number(p.scale) || 100, 160),
-      rows: p.rows.map(r => ({
-        en: legacy ? escapeHtml(r && r.en || '') : sanitizeInline(r && r.en || ''),
-        ko: String(r && r.ko || ''),
-        dim: clamp(0, Number(r && r.dim), 100) || (r && r.dim === 0 ? 0 : 100)
-      }))
+      editRows,
+      drawARows
     };
   }catch(e){ return DEFAULTS(); }
 }
@@ -463,7 +471,7 @@ function widthAtSize1(text){
    slider and this width fit do. Capped so a short sentence doesn't balloon,
    floored so a long one stays legible. */
 function fitFont(availW, printing){
-  const W1 = Math.max(0.05, ...state.rows.map(r => widthAtSize1(plainTextOf(r.en) || 'Type a sentence…')));
+  const W1 = Math.max(0.05, ...activeRows().map(r => widthAtSize1(plainTextOf(r.en) || 'Type a sentence…')));
   const ceiling = printing ? 110 : 240;
   const floor   = printing ? 32 : Math.max(26, 70 - (state.lines - 1) * 11);
   // Prefer one line at a legible size. Only a genuinely long sentence should
@@ -564,7 +572,7 @@ const rowsEl = $('#rows');
 
 function applyDim(row, i){
   const el = row.querySelector('.guide');
-  const v  = state.rows[i].dim;
+  const v  = activeRows()[i].dim;
   const eff = (document.activeElement === el) ? Math.max(v, 35) : v;
   el.style.color = `rgba(17, 20, 26, ${eff / 100})`;
 }
@@ -617,10 +625,10 @@ function makeRow(item, i){
   speakBtns.className = 'speakBtns';
   speakBtns.setAttribute('aria-label', `문장 ${i + 1} 영어 발음 선택`);
 
-  const speakUS = mkBtn('🔊', `문장 ${i + 1} 미국 영어로 읽기`);
+  const speakUS = mkBtn('U.S', `문장 ${i + 1} 미국 영어로 읽기`);
   speakUS.className = 'speakBtn';
   speakUS.dataset.voice = 'en-US';
-  const speakUK = mkBtn('🔊', `문장 ${i + 1} 영국 영어로 읽기`);
+  const speakUK = mkBtn('U.K', `문장 ${i + 1} 영국 영어로 읽기`);
   speakUK.className = 'speakBtn';
   speakUK.dataset.voice = 'en-GB';
   speakBtns.append(speakUS, speakUK);
@@ -640,9 +648,9 @@ function makeRow(item, i){
   row.append(tools, line);
 
   /* --- behaviour --- */
-  en.addEventListener('input', () => { state.rows[i].en = sanitizeInline(en.innerHTML); save(); layoutSoon(); });
+  en.addEventListener('input', () => { activeRows()[i].en = sanitizeInline(en.innerHTML); save(); layoutSoon(); });
   en.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });   // sentences don't wrap via manual newlines
-  ko.addEventListener('input', () => { state.rows[i].ko = ko.textContent; save(); });
+  ko.addEventListener('input', () => { activeRows()[i].ko = ko.textContent; save(); });
   en.addEventListener('focus', () => applyDim(row, i));
   en.addEventListener('blur',  () => applyDim(row, i));
   [en, ko].forEach(el => el.addEventListener('paste', onPastePlain));   // colors only ever come from our own swatch buttons, never pasted HTML
@@ -656,18 +664,18 @@ function makeRow(item, i){
 
   dim.addEventListener('input', () => {
     const v = Number(dim.value);
-    state.rows[i].dim = v;
+    activeRows()[i].dim = v;
     // snap to the three meaningful stops so the teacher can hit them reliably
-    if(v > 0 && v < 15) dim.value = state.rows[i].dim = 0;
-    else if(v >= 25 && v <= 35) dim.value = state.rows[i].dim = 30;
-    else if(v > 92) dim.value = state.rows[i].dim = 100;
+    if(v > 0 && v < 15) dim.value = activeRows()[i].dim = 0;
+    else if(v >= 25 && v <= 35) dim.value = activeRows()[i].dim = 30;
+    else if(v > 92) dim.value = activeRows()[i].dim = 100;
     applyDim(row, i); save();
   });
 
-  speakUS.onclick = () => speakText(plainTextOf(state.rows[i].en), speakUS, 'en-US');
-  speakUK.onclick = () => speakText(plainTextOf(state.rows[i].en), speakUK, 'en-GB');
+  speakUS.onclick = () => speakText(plainTextOf(activeRows()[i].en), speakUS, 'en-US');
+  speakUK.onclick = () => speakText(plainTextOf(activeRows()[i].en), speakUK, 'en-GB');
   del.onclick = () => {
-    state.rows.splice(i, 1); render(); save(); notify('문장을 삭제했어요.');
+    activeRows().splice(i, 1); render(); save(); notify('문장을 삭제했어요.');
   };
 
   applyDim(row, i);
@@ -700,10 +708,13 @@ function onPastePlain(e){
 
 function render(){
   rowsEl.textContent = '';
-  state.rows.forEach((r, i) => rowsEl.appendChild(makeRow(r, i)));
+  activeRows().forEach((r, i) => rowsEl.appendChild(makeRow(r, i)));
   applySnapGrouping();
   layout();
-  if(typeof currentMode !== 'undefined') setMode(currentMode);
+}
+
+function activeRows(){
+  return currentMode === 'drawA' ? state.drawARows : state.editRows;
 }
 
 /* 표시 줄 수 no longer resizes anything (a fixed English size looks better —
@@ -870,6 +881,7 @@ function setMode(m){
   document.body.classList.toggle('mode-draw-a', m === 'drawA');
   document.body.classList.toggle('mode-draw-b', m === 'drawB');
   document.body.classList.toggle('mode-edit', m === 'edit');
+  render();
   $('#mEdit').setAttribute('aria-pressed', String(m === 'edit'));
   $('#mDrawA').setAttribute('aria-pressed', String(m === 'drawA'));
   $('#mDrawB').setAttribute('aria-pressed', String(m === 'drawB'));
@@ -970,21 +982,21 @@ $$('button', colorpop).forEach(btn => {
     if(!colorTarget) return;
     colorSelection(btn.dataset.c);
     const i = $$('.guide').indexOf(colorTarget);
-    if(i >= 0){ state.rows[i].en = sanitizeInline(colorTarget.innerHTML); save(); }
+    if(i >= 0){ activeRows()[i].en = sanitizeInline(colorTarget.innerHTML); save(); }
     colorpop.hidden = true;
   });
 });
 
 $('#dimAll').oninput = e => {
   const v = Number(e.target.value);
-  state.rows.forEach(r => r.dim = v);
+  activeRows().forEach(r => r.dim = v);
   $$('.rowtools .rng').forEach(r => r.value = v);
   $$('.row').forEach((row, i) => applyDim(row, i));
   save();
 };
 
 $('#addRow').onclick = () => {
-  state.rows.push({ en:'', ko:'', dim:100 });
+  activeRows().push({ en:'', ko:'', dim:100 });
   render(); save();
   const last = $$('.guide').pop();
   if(last){
