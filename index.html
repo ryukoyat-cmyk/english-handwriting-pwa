@@ -21,7 +21,7 @@
     --bg:#eef1f5; --paper:#fff; --ink:#1b2027; --muted:#79838f; --hair:#e3e8ee;
     --accent:#eb6536; --accent-soft:#fff1ea;
     --l-outer:#8f9bab; --l-x:#b6c3d2; --l-base:#4a9fd8;
-    --F:64px; --band:120px; --gpos:0 0; --rowH:220px; --shift:0px;
+    --F:64px; --band:120px; --gpos:0 0; --shift:0px;
     --pen:#1b2027;
   }
   *{ box-sizing:border-box; }
@@ -71,12 +71,14 @@
   .dot.pending{ background:#e0b23c; }
 
   /* ---------- stage ---------- */
-  .stage{ height:calc(100% - 60px); overflow:auto; overscroll-behavior:contain; padding:18px 20px 26px; }
-  body.snap .stage{ scroll-snap-type:y proximity; }
+  .stage{ height:calc(100% - 60px); overflow:auto; overscroll-behavior:contain; padding:18px 20px 26px; scroll-snap-type:y proximity; }
   .sheet{ position:relative; background:var(--paper); border:1px solid var(--hair); border-radius:8px; box-shadow:0 10px 30px #1b20270d; padding:14px 26px 20px; min-height:100%; }
 
   .row{ position:relative; display:flex; flex-direction:column; justify-content:center; padding:16px 0; }
-  body.snap .row{ scroll-snap-align:center; min-height:var(--rowH); }
+  /* 표시 줄 수 groups rows into scroll-snap pages of N: only the first row of
+     each group is a snap point, so scrolling settles on page boundaries
+     instead of every single sentence once N > 1. */
+  .row.snapPoint{ scroll-snap-align:start; }
   .row + .row{ border-top:1px dashed #eaeef3; }
 
   .rowline{ display:flex; align-items:stretch; gap:12px; }
@@ -198,7 +200,7 @@
   }
 </style>
 </head>
-<body class="mode-edit snap">
+<body class="mode-edit">
 
 <header class="bar">
   <input class="title" id="title" aria-label="학습지 제목" placeholder="제목" />
@@ -481,8 +483,17 @@ function layout(opts){
   const availW = (probe ? probe.clientWidth : $('#sheet').clientWidth - 52) * 0.97;
 
   const F = fitFont(availW, printing);
-  const cap = FM.cap * F, x = FM.x * F, d = FM.d * F, ascender = FM.ascender * F;
-  const blockH = cap + d, L2 = cap - x, L3 = cap;
+  const cap = FM.cap * F, ascender = FM.ascender * F;
+  // Andika's own x-height sits unusually high (≈70% of cap-height), so pinning
+  // L2 to the font's literal x-height ink packed the capital-to-baseline zone
+  // and left the baseline-to-descender zone comparatively cramped — the three
+  // gaps looked visibly uneven. L1 (cap) and L3 (baseline) stay anchored to
+  // real ink, since that's what "writing sits on the line" depends on; L2 and
+  // L4 become an even three-way split instead of literal x-height/descender
+  // marks, matching how printed ruled notebook paper is laid out (evenly,
+  // independent of any one typeface's metrics) — the true descender ink
+  // (d) is comfortably inside this wider bottom zone either way.
+  const half = cap / 2, L2 = half, L3 = cap, blockH = cap + half;
 
   const nominalGap = Math.max(0.12 * blockH, (ascender - cap) + 0.05 * F);
   const { band: TILE, O: O_natural } = resolveRuling(F, blockH, blockH + nominalGap);
@@ -649,7 +660,17 @@ function onPastePlain(e){
 function render(){
   rowsEl.textContent = '';
   state.rows.forEach((r, i) => rowsEl.appendChild(makeRow(r, i)));
+  applySnapGrouping();
   layout();
+}
+
+/* 표시 줄 수 no longer resizes anything (a fixed English size looks better —
+   like ruled notebook paper, not a screen-filling budget), so its remaining
+   job is purely how scrolling pages through the sheet: N=1 snaps to every
+   sentence, N=3 snaps every three, etc. */
+function applySnapGrouping(){
+  const n = clamp(1, Number(state.lines) || 1, 5);
+  $$('.row').forEach((row, i) => row.classList.toggle('snapPoint', i % n === 0));
 }
 
 /* ================= speech (secondary feature) ================= */
@@ -802,18 +823,18 @@ $$('.nib').forEach(b => b.onclick = () => {
   $$('.nib').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
 });
 
-/* 표시 줄 수 — this is also the size control: fewer lines ⇒ bigger ruling */
+/* 표시 줄 수 — groups rows into scroll-snap pages of N (see applySnapGrouping) */
 const lc = $('#lineCount');
 for(let n = 1; n <= 5; n++){
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = String(n);
-  b.setAttribute('aria-label', `한 화면에 ${n}문장`);
+  b.setAttribute('aria-label', `${n}문장씩 스크롤 스냅`);
   b.setAttribute('aria-pressed', String(n === state.lines));
   b.onclick = () => {
     state.lines = n;
     $$('button', lc).forEach((o, i) => o.setAttribute('aria-pressed', String(i + 1 === n)));
-    document.body.classList.toggle('snap', n === 1);
-    layout(); save();
+    applySnapGrouping();
+    save();
   };
   lc.appendChild(b);
 }
@@ -911,7 +932,6 @@ new ResizeObserver(() => { clearTimeout(roTimer); roTimer = setTimeout(() => lay
 
 /* ================= boot ================= */
 async function boot(){
-  document.body.classList.toggle('snap', state.lines === 1);
   try{
     await Promise.all([
       document.fonts.load(`400 200px Andika`),
