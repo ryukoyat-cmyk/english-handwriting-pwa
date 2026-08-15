@@ -84,8 +84,12 @@
   .rowline{ display:flex; align-items:stretch; gap:12px; }
   .rowbody{ flex:1 1 auto; min-width:0; }
 
+  .speakBtns{
+    flex:0 0 52px; align-self:flex-start; margin-top:6px;
+    display:flex; flex-direction:column; gap:6px;
+  }
+
   .speakBtn{
-    flex:0 0 auto; align-self:flex-start; margin-top:6px;
     width:52px; height:52px; border-radius:50%;
     background:var(--accent); color:#fff; font-size:22px;
     display:grid; place-items:center; box-shadow:0 4px 12px #eb653645;
@@ -196,7 +200,8 @@
     .stage{ padding:10px 8px 20px; }
     .sheet{ padding:10px 12px 16px; border-radius:5px; }
     .fab{ right:14px; bottom:14px; height:46px; padding:0 16px; }
-    .speakBtn{ width:40px; height:40px; font-size:18px; margin-top:3px; }
+    .speakBtns{ flex-basis:40px; margin-top:3px; gap:5px; }
+    .speakBtn{ width:40px; height:40px; font-size:17px; }
     .rowline{ gap:8px; }
   }
 
@@ -608,8 +613,17 @@ function makeRow(item, i){
   const del = mkBtn('✕', `문장 ${i + 1} 삭제`);
   tools.append(num, dim, del);
 
-  const speak = mkBtn('🔊', `문장 ${i + 1} 읽기 (0.8배속)`);
-  speak.className = 'speakBtn';
+  const speakBtns = document.createElement('div');
+  speakBtns.className = 'speakBtns';
+  speakBtns.setAttribute('aria-label', `문장 ${i + 1} 영어 발음 선택`);
+
+  const speakUS = mkBtn('🔊', `문장 ${i + 1} 미국 영어로 읽기`);
+  speakUS.className = 'speakBtn';
+  speakUS.dataset.voice = 'en-US';
+  const speakUK = mkBtn('🔊', `문장 ${i + 1} 영국 영어로 읽기`);
+  speakUK.className = 'speakBtn';
+  speakUK.dataset.voice = 'en-GB';
+  speakBtns.append(speakUS, speakUK);
 
   const ruleClip = document.createElement('div');
   ruleClip.className = 'ruleClip';
@@ -621,7 +635,7 @@ function makeRow(item, i){
 
   const line = document.createElement('div');
   line.className = 'rowline';
-  line.append(speak, body);
+  line.append(speakBtns, body);
 
   row.append(tools, line);
 
@@ -650,7 +664,8 @@ function makeRow(item, i){
     applyDim(row, i); save();
   });
 
-  speak.onclick = () => speakText(plainTextOf(state.rows[i].en), speak);
+  speakUS.onclick = () => speakText(plainTextOf(state.rows[i].en), speakUS, 'en-US');
+  speakUK.onclick = () => speakText(plainTextOf(state.rows[i].en), speakUK, 'en-GB');
   del.onclick = () => {
     state.rows.splice(i, 1); render(); save(); notify('문장을 삭제했어요.');
   };
@@ -702,13 +717,13 @@ function applySnapGrouping(){
 
 /* ================= speech (secondary feature) ================= */
 const SPEECH_RATE = 0.8;
-function speakText(text, btn){
+function speakText(text, btn, lang = 'en-US'){
   if(!text.trim()) return notify('읽을 문장을 먼저 입력하세요.');
   if(!('speechSynthesis' in window)) return notify('이 브라우저는 음성을 지원하지 않아요.');
   speechSynthesis.cancel();
   $$('.speakBtn.speaking').forEach(b => b.classList.remove('speaking'));   // only one plays at a time
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-US'; u.rate = SPEECH_RATE;
+  u.lang = lang; u.rate = SPEECH_RATE;
   if(btn){
     btn.classList.add('speaking');
     u.onend = u.onerror = () => btn.classList.remove('speaking');
