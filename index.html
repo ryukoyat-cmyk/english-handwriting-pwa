@@ -102,19 +102,11 @@
   @keyframes speakPulse{ 0%,100%{ box-shadow:0 4px 12px #eb653645; } 50%{ box-shadow:0 4px 22px #eb6536a0; } }
   @media (prefers-reduced-motion:reduce){ .speakBtn.speaking{ animation:none; outline:3px solid #eb653690; } }
 
-  /* Andika's own line-height metrics force a huge half-leading gap if the CSS
-     line-height is set to the tight spacing we actually want — the browser's
-     centering model and a small gap are fundamentally incompatible. So the
-     truth (line-height = TILE, large) stays internal to .guide, and .ruleClip
-     shows only a small, fixed-height window onto it: .guide is pulled up by
-     --shift (a relative-position offset, so editing/selection still work
-     normally) until its cap-line lands right at the window's own top edge. */
-  .ruleClip{ position:relative; overflow:hidden; }
-  .guide{
-    font-family:Andika,Georgia,"Times New Roman",serif; font-weight:400;
-    font-size:var(--F); line-height:var(--band);
-    position:relative; top:var(--shift);
-    outline:0; padding:0 .12em; margin:0;
+  /* The rules live on the clipping layer, while the editable text is shifted
+     independently onto the blue baseline. This keeps every wrapped line as a
+     complete four-line unit without inheriting browser line-box whitespace. */
+  .ruleClip{
+    position:relative; overflow:hidden;
     background-image:
       linear-gradient(var(--l-outer) 0 2px, transparent 2px),
       linear-gradient(var(--l-x)     0 1.5px, transparent 1.5px),
@@ -123,7 +115,12 @@
     background-repeat:repeat-y;
     background-size:100% var(--band);
     background-position:var(--gpos);
-    background-origin:border-box;
+  }
+  .guide{
+    font-family:Andika,Georgia,"Times New Roman",serif; font-weight:400;
+    font-size:var(--F); line-height:var(--band);
+    position:relative; top:var(--shift);
+    outline:0; padding:0 .12em; margin:0;
     caret-color:var(--accent);
     word-break:break-word;
     -webkit-user-modify:read-write-plaintext-only;
@@ -161,10 +158,8 @@
   body.mode-draw-a .ruleClip{ touch-action:none; cursor:crosshair; }
   body.mode-draw .guide, body.mode-draw-b .ko{ -webkit-user-modify:read-only; user-select:none; }
   body.mode-draw .stage{ overscroll-behavior:none; }
-  body.mode-draw-a .guide{ color:transparent !important; caret-color:transparent; background-image:linear-gradient(var(--l-outer) 0 2px, transparent 2px),linear-gradient(var(--l-x) 0 1.5px, transparent 1.5px),linear-gradient(var(--l-base) 0 2px, transparent 2px),linear-gradient(var(--l-outer) 0 2px, transparent 2px) !important; background-repeat:repeat-y; background-size:100% var(--band); background-position:var(--gpos); }
+  body.mode-draw-a .guide{ color:transparent !important; caret-color:transparent; }
   body.mode-draw-a .guide:empty::before{ content:none; }
-  body.mode-draw-a .guide{ background-image:none !important; top:0; }
-  body.mode-draw-a .ruleClip{ background-image:linear-gradient(var(--l-outer) 0 2px, transparent 2px),linear-gradient(var(--l-x) 0 1.5px, transparent 1.5px),linear-gradient(var(--l-base) 0 2px, transparent 2px),linear-gradient(var(--l-outer) 0 2px, transparent 2px); background-repeat:repeat-y; background-size:100% var(--band); background-position:var(--gpos); }
   body.mode-draw-b #rows{ display:none; }
   body.mode-draw-b #rows:empty::before{ display:none; }
 
@@ -466,28 +461,6 @@ function fixedGuideFont(){
   return BASE_GUIDE_FONT * s;
 }
 
-/* Andika's own metrics make the browser's line-height half-leading push the
-   real baseline much lower than our ink-based cap line calls for. Chasing
-   that with a bigger line-height only pushes it lower still (each px of
-   line-height splits ~50/50 above/below the baseline), so the tile height
-   that finally satisfies "descender rule fits above the tile's bottom edge"
-   works out to roughly 1.3× the block itself — a wide gap with no way to
-   trim it from inside CSS's own centering model. Find that tile size (TILE,
-   O_natural) for internal use only; it is never shown directly. */
-function resolveRuling(F, blockH, startBand){
-  let band = startBand;
-  for(let i = 0; i < 6; i++){
-    const bo = baselineInLineBox(F, band);
-    const L3 = FM.cap * F;
-    const O  = ((bo - L3) % band + band) % band;
-    if(O + blockH - 2 <= band - 0.5) return { band, O };
-    band = O + blockH - 2 + 6;
-  }
-  const bo = baselineInLineBox(F, band);
-  const L3 = FM.cap * F;
-  return { band, O:((bo - L3) % band + band) % band };
-}
-
 function layout(opts){
   if(!FM) return;
   const printing = !!(opts && opts.print);
@@ -495,35 +468,31 @@ function layout(opts){
   const perRow = printing ? Infinity : Math.max(108, (stageH - 38) / state.lines);
   const F = fixedGuideFont();
 
-  // Preserve the established four-line teaching geometry: the capital line,
-  // dashed middle, blue baseline and descender line form three equal zones.
-  // The font is fitted into this ruling; the ruling is never derived from a
-  // single glyph's x-height or descender shape.
-  const cap = FM.cap * F, ascender = FM.ascender * F;
-  // Move the dashed second rule slightly upward so the x-height-to-baseline
-  // zone (rules 2→3) has a little more breathing room for the practice face.
-  const half = cap / 2, L2 = cap * 0.40, L3 = cap, blockH = cap + half;
-  const nominalGap = Math.max(0.12 * blockH, (ascender - cap) + 0.05 * F);
-  const { band:TILE, O:O_natural } = resolveRuling(F, blockH, blockH + nominalGap);
-  const O_target = Math.max((ascender - cap) * 1.3, 0.10 * blockH);
-  const shift = Math.max(0, O_natural - O_target);
+  // One wrapped visual line is one whole four-line guide. The font metrics
+  // set the three teaching boundaries: cap height, x-height and descender.
+  const cap = FM.cap * F;
+  const L3 = cap;
+  const L2 = Math.max(0, L3 - FM.x * F);
+  const blockH = L3 + FM.d * F + 3;
+  const TILE = blockH + Math.max(10, 0.12 * F);
+  const baseline = baselineInLineBox(F, TILE);
+  const shift = L3 - baseline;
 
   const p = n => `0 ${n.toFixed(2)}px`;
   root.style.setProperty('--F', F.toFixed(2) + 'px');
   root.style.setProperty('--band', TILE.toFixed(2) + 'px');
   root.style.setProperty('--gpos',
-    [ p(O_natural), p(O_natural + L2), p(O_natural + L3), p(O_natural + blockH - 2) ].join(', '));
-  root.style.setProperty('--shift', (-shift).toFixed(2) + 'px');
+    [ p(0), p(L2), p(L3), p(blockH - 2) ].join(', '));
+  root.style.setProperty('--shift', shift.toFixed(2) + 'px');
   root.style.setProperty('--page-row-height', printing ? 'auto' : perRow.toFixed(2) + 'px');
 
-  GEO = { F, band:TILE, blockH, L2, L3, O:O_natural, O_target, shift, winH:O_target + blockH + 4 };
+  GEO = { F, band:TILE, blockH, L2, L3, shift, winH:TILE };
 
-  // Per-row window height: most sentences are one line (O_target + blockH),
-  // but a rare long one that still wraps needs room for its extra lines too —
-  // measured after the shared CSS vars above have taken effect.
+  // Each wrapped line gets one complete guide tile. Measure after the shared
+  // CSS variables have taken effect so long sentences receive more tiles.
   $$('.guide').forEach(g => {
-    const lines = Math.max(1, Math.round(g.scrollHeight / TILE));
-    const h = GEO.O_target + (lines - 1) * TILE + blockH + 4;
+    const lines = Math.max(1, Math.ceil((g.scrollHeight - 1) / TILE));
+    const h = lines * TILE;
     const clip = g.closest('.ruleClip');
     if(clip) clip.style.height = h.toFixed(1) + 'px';
   });
