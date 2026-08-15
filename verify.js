@@ -97,26 +97,63 @@ async function fresh(browser, vw, vh) {
     await ctx.close();
   }
 
-  /* ---------- F-3 sizing / F-4 Korean gloss is fixed, not line-count-driven ---------- */
+  /* ---------- F-3 English size/gap is uniform and line-count-independent ---------- */
   {
     const { ctx, page } = await fresh(browser, 1440, 900);
-    const one = await page.evaluate(() => {
-      const st = document.querySelector('.stage').clientHeight;
-      const g  = document.querySelector('.guide').getBoundingClientRect().height;
+    const read = () => page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.row')].map(row => {
+        const g = row.querySelector('.guide'), clip = row.querySelector('.ruleClip');
+        return { F: parseFloat(getComputedStyle(g).fontSize), clipH: clip.getBoundingClientRect().height };
+      });
       const ko = document.querySelector('.ko');
       const cs = getComputedStyle(ko);
-      return { ratio: g / st, koPx: parseFloat(cs.fontSize), koFamily: cs.fontFamily, koWeight: cs.fontWeight };
+      return { rows, koPx: parseFloat(cs.fontSize), koFamily: cs.fontFamily, koWeight: cs.fontWeight };
     });
-    (one.ratio >= 0.70 ? ok : bad)('F-3 N=1 fills screen', `guide/stage = ${(one.ratio * 100).toFixed(0)}%`);
-    (one.koPx >= 26 ? ok : bad)('F-4 Korean size is large', `${one.koPx.toFixed(1)}px (was 17px)`);
+
+    const one = await read();
+    const fs = one.rows.map(r => r.F), clips = one.rows.map(r => r.clipH);
+    const uniform = fs.every(f => Math.abs(f - fs[0]) < 0.5) && clips.every(h => Math.abs(h - clips[0]) < 1);
+    (uniform ? ok : bad)('F-3 every row shares the same font size and window height',
+      `F=[${fs.map(f => f.toFixed(1))}] clipH=[${clips.map(h => h.toFixed(1))}]`);
+
+    // the gap this fixes was ~90-110px (36-45% of block height) before; it
+    // should now be a small, fixed headroom, not proportional to that old bug
+    const tight = clips[0] < fs[0] * 1.3;
+    (tight ? ok : bad)('F-3 row window is tight (no oversized gap)', `clipH ${clips[0].toFixed(1)}px vs F ${fs[0].toFixed(1)}px`);
+
+    (one.koPx >= 32 ? ok : bad)('F-4 Korean size is large', `${one.koPx.toFixed(1)}px (was 17px)`);
     (one.koFamily.toLowerCase().includes('pretendard') ? ok : bad)('F-4 Korean uses Pretendard', one.koFamily);
     (Number(one.koWeight) >= 700 ? ok : bad)('F-4 Korean is bold', `weight ${one.koWeight}`);
 
+    // F-3's original premise (line count drives size) was reversed by design:
+    // switching line count must NOT change the English size or gap at all.
     await page.evaluate(() => document.querySelectorAll('#lineCount button')[2].click());
     await page.waitForTimeout(200);
-    const three = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.ko')).fontSize));
-    (Math.abs(three - one.koPx) < 0.5 ? ok : bad)('F-4 Korean size independent of line count',
-      `N=1 → ${one.koPx.toFixed(1)}px, N=3 → ${three.toFixed(1)}px`);
+    const three = await read();
+    const unaffected = Math.abs(three.rows[0].F - one.rows[0].F) < 0.5 &&
+                        Math.abs(three.koPx - one.koPx) < 0.5;
+    (unaffected ? ok : bad)('F-3/F-4 line count no longer resizes anything',
+      `English N=1 ${one.rows[0].F.toFixed(1)}px → N=3 ${three.rows[0].F.toFixed(1)}px; Korean ${one.koPx.toFixed(1)}px → ${three.koPx.toFixed(1)}px`);
+    await ctx.close();
+  }
+
+  /* ---------- F-16 typing a longer sentence refits the font (no manual layout() call otherwise) ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+    const before = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.guide')).fontSize));
+    await page.evaluate(() => {
+      const g = document.querySelector('.guide');
+      g.textContent = 'My favorite subject at school this semester is definitely mathematics because it is fun.';
+      g.dispatchEvent(new Event('input'));
+    });
+    await page.waitForTimeout(400);   // layoutSoon() debounce
+    const after = await page.evaluate(() => {
+      const g = document.querySelector('.guide');
+      return { F: parseFloat(getComputedStyle(g).fontSize), overflowsWidth: g.scrollWidth > g.clientWidth + 2 };
+    });
+    (after.F < before && after.F >= 69 && !after.overflowsWidth ? ok : bad)(
+      'F-16 long sentence refits without shrinking below the floor',
+      `${before.toFixed(1)}px → ${after.F.toFixed(1)}px, overflow ${after.overflowsWidth}`);
     await ctx.close();
   }
 
@@ -132,7 +169,7 @@ async function fresh(browser, vw, vh) {
       `100% → ${f100.toFixed(1)}px, 50% → ${f50.toFixed(1)}px (ratio ${(f50 / f100).toFixed(3)})`);
 
     const koUnchanged = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.ko')).fontSize));
-    (koUnchanged >= 26 ? ok : bad)('F-12 Korean unaffected by size slider', `${koUnchanged.toFixed(1)}px`);
+    (koUnchanged >= 32 ? ok : bad)('F-12 Korean unaffected by size slider', `${koUnchanged.toFixed(1)}px`);
     await ctx.close();
   }
 
