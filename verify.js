@@ -77,9 +77,19 @@ async function fresh(browser, vw, vh) {
     const descBot = m.base + m.yDesc;
 
     (near(capTop,  m.L1, 2) ? ok : bad)('F-2 capital   → L1', `ink ${capTop.toFixed(1)} vs rule ${m.L1.toFixed(1)}`);
-    (near(xTop,    m.L2, 2) ? ok : bad)('F-2 x-height  → L2', `ink ${xTop.toFixed(1)} vs rule ${m.L2.toFixed(1)}`);
     (near(m.base,  m.L3, 1) ? ok : bad)('F-2 baseline  → L3', `ink ${m.base.toFixed(1)} vs rule ${m.L3.toFixed(1)}`);
-    (near(descBot, m.L4, 2) ? ok : bad)('F-2 descender → L4', `ink ${descBot.toFixed(1)} vs rule ${m.L4.toFixed(1)}`);
+    // L2/L4 are an even three-way split now, not literal x-height/descender
+    // ink (Andika's x-height sits unusually high and made the middle zone
+    // look cramped) — check the split itself instead of ink-to-rule match.
+    // L4 is nudged 2px inward (the drawn line's near edge vs far edge, same
+    // trim used everywhere) so the third gap is expected to run ~2px short.
+    const g12 = m.L2 - m.L1, g23 = m.L3 - m.L2, g34 = m.L4 - m.L3;
+    const evenGaps = near(g12, g23, 1.5) && near(g23, g34, 2.5);
+    (evenGaps ? ok : bad)('F-2 L1-L2-L3-L4 evenly spaced',
+      `gaps ${g12.toFixed(1)} / ${g23.toFixed(1)} / ${g34.toFixed(1)}px`);
+    // the descender still needs to physically fit inside the bottom third
+    (descBot <= m.L4 + 1 ? ok : bad)('F-2 descender ink fits within L4',
+      `ink ${descBot.toFixed(1)} vs rule ${m.L4.toFixed(1)}`);
 
     // Ascenders now rise past L1. They must stay inside the gap and never reach
     // the bottom rule of the block above (which sits one band higher).
@@ -154,6 +164,25 @@ async function fresh(browser, vw, vh) {
     (after.F < before && after.F >= 69 && !after.overflowsWidth ? ok : bad)(
       'F-16 long sentence refits without shrinking below the floor',
       `${before.toFixed(1)}px → ${after.F.toFixed(1)}px, overflow ${after.overflowsWidth}`);
+    await ctx.close();
+  }
+
+  /* ---------- F-17 표시 줄 수 groups rows into scroll-snap pages ---------- */
+  {
+    const { ctx, page } = await fresh(browser, 1440, 900);
+    // three default rows: N=1 -> every row is its own snap point;
+    // N=3 -> only the first row of the (single, 3-row) group is.
+    const n1 = await page.evaluate(() => {
+      document.querySelectorAll('#lineCount button')[0].click();
+      return [...document.querySelectorAll('.row')].map(r => r.classList.contains('snapPoint'));
+    });
+    const n3 = await page.evaluate(() => {
+      document.querySelectorAll('#lineCount button')[2].click();
+      return [...document.querySelectorAll('.row')].map(r => r.classList.contains('snapPoint'));
+    });
+    const good = n1.every(Boolean) && n3[0] === true && n3[1] === false && n3[2] === false;
+    (good ? ok : bad)('F-17 line-count buttons actually change grouping',
+      `N=1 ${JSON.stringify(n1)} · N=3 ${JSON.stringify(n3)}`);
     await ctx.close();
   }
 
