@@ -458,31 +458,12 @@ function baselineInLineBox(fontPx, linePx){
 const root = document.documentElement;
 let GEO = { band:120, blockH:104, F:64, L2:40, L3:80, winH:140, shift:0 };
 
-const measureCtx = document.createElement('canvas').getContext('2d');
-function widthAtSize1(text){
-  measureCtx.font = `400 100px ${FONT}`;
-  return measureCtx.measureText(text || '').width / 100;
-}
-
-/* Font size: fit the longest sentence on ONE line at the available width, like
-   a notebook where every ruled line is the same size regardless of how many
-   sentences are on the page. Line count no longer shrinks it — only the size
-   slider and this width fit do. Capped so a short sentence doesn't balloon,
-   floored so a long one stays legible. */
-function fitFont(availW, printing){
-  const W1 = Math.max(0.05, ...activeRows().map(r => widthAtSize1(plainTextOf(r.en) || 'Type a sentence…')));
-  const ceiling = printing ? 110 : 240;
-  const floor   = printing ? 32 : Math.max(26, 70 - (state.lines - 1) * 11);
-  // Prefer one line at a legible size. Only a genuinely long sentence should
-  // ever hit the floor — and when it does, let it wrap to two lines instead
-  // of shrinking every row (including short ones, since F is shared) down to
-  // an unreadable size just to keep that one sentence on a single line.
-  let fitted = clamp(floor, availW / W1, ceiling);
-  if(fitted <= floor + 0.5) fitted = clamp(floor, (2 * availW) / W1, ceiling);
-  // scale multiplies the fitted size afterward, so it still has an effect
-  // even when the width fit (not the ceiling) is what's binding
+/* The four-line guide defines the writing size. A long sentence must wrap
+   onto another guide rather than changing the letter size of every sentence. */
+const BASE_GUIDE_FONT = 96;
+function fixedGuideFont(){
   const s = clamp(50, Number(state.scale) || 100, 160) / 100;
-  return fitted * s;
+  return BASE_GUIDE_FONT * s;
 }
 
 /* Andika's own metrics make the browser's line-height half-leading push the
@@ -510,17 +491,9 @@ function resolveRuling(F, blockH, startBand){
 function layout(opts){
   if(!FM) return;
   const printing = !!(opts && opts.print);
-  const probe = $('.guide');
-  const availW = (probe ? probe.clientWidth : $('#sheet').clientWidth - 52) * 0.97;
-
   const stageH = $('#stage').clientHeight;
   const perRow = printing ? Infinity : Math.max(108, (stageH - 38) / state.lines);
-  const ko = $('.ko');
-  const koH = ko ? Math.max(38, ko.getBoundingClientRect().height + 10) : 58;
-  const chromeH = koH + 38;
-  const metricRatio = FM.cap + FM.d + 0.14;
-  const heightFit = printing ? Infinity : Math.max(24, (perRow - chromeH) / metricRatio);
-  const F = Math.min(fitFont(availW, printing), heightFit);
+  const F = fixedGuideFont();
 
   // Preserve the established four-line teaching geometry: the capital line,
   // dashed middle, blue baseline and descender line form three equal zones.
