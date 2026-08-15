@@ -21,7 +21,7 @@
     --bg:#eef1f5; --paper:#fff; --ink:#1b2027; --muted:#79838f; --hair:#e3e8ee;
     --accent:#eb6536; --accent-soft:#fff1ea;
     --l-outer:#8f9bab; --l-x:#b6c3d2; --l-base:#4a9fd8;
-    --F:64px; --band:120px; --gpos:0 0; --rowH:220px;
+    --F:64px; --band:120px; --gpos:0 0; --rowH:220px; --shift:0px;
     --pen:#1b2027;
   }
   *{ box-sizing:border-box; }
@@ -75,8 +75,8 @@
   body.snap .stage{ scroll-snap-type:y proximity; }
   .sheet{ position:relative; background:var(--paper); border:1px solid var(--hair); border-radius:8px; box-shadow:0 10px 30px #1b20270d; padding:14px 26px 20px; min-height:100%; }
 
-  .row{ position:relative; min-height:var(--rowH); display:flex; flex-direction:column; justify-content:center; }
-  body.snap .row{ scroll-snap-align:center; }
+  .row{ position:relative; display:flex; flex-direction:column; justify-content:center; padding:16px 0; }
+  body.snap .row{ scroll-snap-align:center; min-height:var(--rowH); }
   .row + .row{ border-top:1px dashed #eaeef3; }
 
   .rowline{ display:flex; align-items:stretch; gap:12px; }
@@ -96,9 +96,18 @@
   @keyframes speakPulse{ 0%,100%{ box-shadow:0 4px 12px #eb653645; } 50%{ box-shadow:0 4px 22px #eb6536a0; } }
   @media (prefers-reduced-motion:reduce){ .speakBtn.speaking{ animation:none; outline:3px solid #eb653690; } }
 
+  /* Andika's own line-height metrics force a huge half-leading gap if the CSS
+     line-height is set to the tight spacing we actually want — the browser's
+     centering model and a small gap are fundamentally incompatible. So the
+     truth (line-height = TILE, large) stays internal to .guide, and .ruleClip
+     shows only a small, fixed-height window onto it: .guide is pulled up by
+     --shift (a relative-position offset, so editing/selection still work
+     normally) until its cap-line lands right at the window's own top edge. */
+  .ruleClip{ position:relative; overflow:hidden; }
   .guide{
     font-family:Andika,Georgia,"Times New Roman",serif; font-weight:400;
     font-size:var(--F); line-height:var(--band);
+    position:relative; top:var(--shift);
     outline:0; padding:0 .12em; margin:0;
     background-image:
       linear-gradient(var(--l-outer) 0 2px, transparent 2px),
@@ -116,12 +125,12 @@
   .guide:empty::before{ content:attr(data-ph); color:#c3cbd5; }
 
   .ko{
-    /* Fixed independent of line-count / sentence-size scale — the teacher's Korean
-       gloss should stay a stable, comfortable size regardless of how the English
-       ruling is resized. Only the viewport width nudges it, so it still fits phones. */
+    /* Fixed — independent of the sentence-size slider — so the Korean gloss
+       stays a stable, comfortable size no matter how the English ruling is
+       resized. Only the viewport width nudges it, so it still fits phones. */
     font-family:Pretendard,system-ui,sans-serif; font-weight:800;
-    font-size:clamp(26px, 4.4vw, 42px); line-height:1.35; color:#3a4451;
-    outline:0; margin:8px 0 0; padding:2px 4px; border-radius:6px; min-height:1.35em;
+    font-size:clamp(32px, 5.6vw, 54px); line-height:1.3; color:#3a4451;
+    outline:0; margin:10px 0 0; padding:2px 4px; border-radius:6px; min-height:1.3em;
     word-break:break-word;
   }
   .ko:empty::before{ content:attr(data-ph); color:#c3cbd5; }
@@ -414,15 +423,7 @@ function baselineInLineBox(fontPx, linePx){
 
 /* ================= layout ================= */
 const root = document.documentElement;
-let GEO = { band:120, blockH:104, F:64, L2:40, L3:80, rowH:200 };
-
-/* band = F * K — the four-rule block plus the gap under it. The gap must be at
-   least as deep as the ascender overshoot, or the next line's b/d/f/h/k/l would
-   cut through this block's bottom rule. */
-const K = () => {
-  const block = FM.cap + FM.d;
-  return block + Math.max(0.163 * block, (FM.ascender - FM.cap) + 0.06);
-};
+let GEO = { band:120, blockH:104, F:64, L2:40, L3:80, winH:140, shift:0 };
 
 const measureCtx = document.createElement('canvas').getContext('2d');
 function widthAtSize1(text){
@@ -430,30 +431,35 @@ function widthAtSize1(text){
   return measureCtx.measureText(text || '').width / 100;
 }
 
-/* The ruling has to satisfy two budgets at once: the vertical slot the row owns,
-   and the width of the sheet. Pick the largest size that fits the longest
-   sentence in at most `maxWrap` ruled lines. */
-function computeGeometry(rowBudget, availW, maxWrap){
+/* Font size: fit the longest sentence on ONE line at the available width, like
+   a notebook where every ruled line is the same size regardless of how many
+   sentences are on the page. Line count no longer shrinks it — only the size
+   slider and this width fit do. Capped so a short sentence doesn't balloon,
+   floored so a long one stays legible. */
+function fitFont(availW, printing){
   const W1 = Math.max(0.05, ...state.rows.map(r => widthAtSize1(plainTextOf(r.en) || 'Type a sentence…')));
-  const k = K();
-  let F = 0;
-  for(let n = 1; n <= maxWrap; n++){
-    F = Math.max(F, Math.min(n * availW / W1, rowBudget / (n * k)));
-  }
-  F = clamp(16, F, 320);
-  const band   = F * k;
-  const blockH = F * (FM.cap + FM.d);
-  return { band, blockH, F, L2:(FM.cap - FM.x) * F, L3:FM.cap * F };
+  const ceiling = printing ? 110 : 240;
+  const floor   = printing ? 40 : 70;
+  // Prefer one line at a legible size. Only a genuinely long sentence should
+  // ever hit the floor — and when it does, let it wrap to two lines instead
+  // of shrinking every row (including short ones, since F is shared) down to
+  // an unreadable size just to keep that one sentence on a single line.
+  let fitted = clamp(floor, availW / W1, ceiling);
+  if(fitted <= floor + 0.5) fitted = clamp(floor, (2 * availW) / W1, ceiling);
+  // scale multiplies the fitted size afterward, so it still has an effect
+  // even when the width fit (not the ceiling) is what's binding
+  const s = clamp(50, Number(state.scale) || 100, 160) / 100;
+  return fitted * s;
 }
 
-/* Find a line-height ("band") for which the four rule positions — measured
-   against THIS line-height's own real baseline — fit inside a single tile
-   without wrapping past its bottom edge. Naively trusting the first-guess
-   band could place the descender rule's background-position beyond the tile
-   height; repeat-y then wraps it back to the TOP of the same block, drawing
-   a spurious line above the capital rule. Growing the tile to swallow any
-   overflow and re-measuring (half-leading shifts when line-height does)
-   converges in a couple of iterations. */
+/* Andika's own metrics make the browser's line-height half-leading push the
+   real baseline much lower than our ink-based cap line calls for. Chasing
+   that with a bigger line-height only pushes it lower still (each px of
+   line-height splits ~50/50 above/below the baseline), so the tile height
+   that finally satisfies "descender rule fits above the tile's bottom edge"
+   works out to roughly 1.3× the block itself — a wide gap with no way to
+   trim it from inside CSS's own centering model. Find that tile size (TILE,
+   O_natural) for internal use only; it is never shown directly. */
 function resolveRuling(F, blockH, startBand){
   let band = startBand;
   for(let i = 0; i < 6; i++){
@@ -471,41 +477,50 @@ function resolveRuling(F, blockH, startBand){
 function layout(opts){
   if(!FM) return;
   const printing = !!(opts && opts.print);
-  const stage = $('#stage');
   const probe = $('.guide');
   const availW = (probe ? probe.clientWidth : $('#sheet').clientWidth - 52) * 0.97;
 
-  const rowH = printing
-    ? 190
-    : Math.max(150, (stage.clientHeight - 40) / state.lines - 14);
+  const F = fitFont(availW, printing);
+  const cap = FM.cap * F, x = FM.x * F, d = FM.d * F, ascender = FM.ascender * F;
+  const blockH = cap + d, L2 = cap - x, L3 = cap;
 
-  // The Korean gloss is a fixed CSS size now (not derived here); reserve a
-  // rough constant for it and let the four rules have everything else.
-  const guideBudget = Math.max(90, rowH - 62);
+  const nominalGap = Math.max(0.12 * blockH, (ascender - cap) + 0.05 * F);
+  const { band: TILE, O: O_natural } = resolveRuling(F, blockH, blockH + nominalGap);
 
-  const fit = computeGeometry(guideBudget, availW, printing ? 3 : (state.lines === 1 ? 3 : 2));
-  const s = clamp(50, Number(state.scale) || 100, 160) / 100;
-  const F = fit.F * s;
-  const g = {
-    F,
-    band: F * K(),
-    blockH: F * (FM.cap + FM.d),
-    L2: (FM.cap - FM.x) * F,
-    L3: FM.cap * F
-  };
-
-  const { band, O } = resolveRuling(g.F, g.blockH, g.band);
-  g.band = band;
-  GEO = Object.assign(g, { rowH, O });
+  // The window a teacher actually sees: a small, constant headroom (just
+  // enough for the ascender overshoot) plus the block itself — the same for
+  // every row, since it depends only on the shared F, not on any row's text.
+  const O_target = Math.max((ascender - cap) * 1.3, 0.10 * blockH);
+  const shift = Math.max(0, O_natural - O_target);
 
   const p = n => `0 ${n.toFixed(2)}px`;
-  root.style.setProperty('--F', g.F.toFixed(2) + 'px');
-  root.style.setProperty('--band', g.band.toFixed(2) + 'px');
+  root.style.setProperty('--F', F.toFixed(2) + 'px');
+  root.style.setProperty('--band', TILE.toFixed(2) + 'px');
   root.style.setProperty('--gpos',
-    [ p(O), p(O + g.L2), p(O + g.L3), p(O + g.blockH - 2) ].join(', '));
-  root.style.setProperty('--rowH', printing ? 'auto' : rowH.toFixed(0) + 'px');
+    [ p(O_natural), p(O_natural + L2), p(O_natural + L3), p(O_natural + blockH - 2) ].join(', '));
+  root.style.setProperty('--shift', (-shift).toFixed(2) + 'px');
+
+  GEO = { F, band:TILE, blockH, L2, L3, O:O_natural, O_target, shift, winH:O_target + blockH + 4 };
+
+  // Per-row window height: most sentences are one line (O_target + blockH),
+  // but a rare long one that still wraps needs room for its extra lines too —
+  // measured after the shared CSS vars above have taken effect.
+  $$('.guide').forEach(g => {
+    const lines = Math.max(1, Math.round(g.scrollHeight / TILE));
+    const h = GEO.O_target + (lines - 1) * TILE + blockH + 4;
+    const clip = g.closest('.ruleClip');
+    if(clip) clip.style.height = h.toFixed(1) + 'px';
+  });
 
   sizeCanvas();
+}
+
+/* Typing a longer sentence than what's there can require a smaller F to keep
+   it on one line — debounced so it doesn't refit on every keystroke. */
+let layoutTimer = null;
+function layoutSoon(){
+  clearTimeout(layoutTimer);
+  layoutTimer = setTimeout(() => layout(), 180);
 }
 
 /* ================= rows ================= */
@@ -565,9 +580,13 @@ function makeRow(item, i){
   const speak = mkBtn('🔊', `문장 ${i + 1} 읽기 (0.8배속)`);
   speak.className = 'speakBtn';
 
+  const ruleClip = document.createElement('div');
+  ruleClip.className = 'ruleClip';
+  ruleClip.appendChild(en);
+
   const body = document.createElement('div');
   body.className = 'rowbody';
-  body.append(en, ko);
+  body.append(ruleClip, ko);
 
   const line = document.createElement('div');
   line.className = 'rowline';
@@ -576,7 +595,7 @@ function makeRow(item, i){
   row.append(tools, line);
 
   /* --- behaviour --- */
-  en.addEventListener('input', () => { state.rows[i].en = sanitizeInline(en.innerHTML); save(); });
+  en.addEventListener('input', () => { state.rows[i].en = sanitizeInline(en.innerHTML); save(); layoutSoon(); });
   en.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });   // sentences don't wrap via manual newlines
   ko.addEventListener('input', () => { state.rows[i].ko = ko.textContent; save(); });
   en.addEventListener('focus', () => applyDim(row, i));
